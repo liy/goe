@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -10,9 +12,17 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/liy/goe/src/goe/protobuf"
+	"github.com/liy/goe/src/protobuf"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	ts "google.golang.org/protobuf/types/known/timestamppb"
 )
+
+type repositoryService struct {}
+
+func (service *repositoryService) GetRepository(ctx context.Context, req *protobuf.GetRepositoryRequest) (*protobuf.GetRepositoryResponse, error) {
+	return nil, nil
+}
 
 // CheckIfError should be used to naively panics if an error is not nil.
 func CheckIfError(err error) {
@@ -117,5 +127,15 @@ func main() {
 
 	fmt.Println(data.Commits[0])
 
+	const port = ":8888"
+	listener, err := net.Listen("tcp", port)
+	CheckIfError(err)
+	credentials, err := credentials.NewServerTLSFromFile("./certificates/cert.pem", "./certificates/key.pem")
+	CheckIfError(err)
+	opts := []grpc.ServerOption{grpc.Creds(credentials)}
+	s := grpc.NewServer(opts...)
+	protobuf.RegisterRepositoryServiceServer(s, new(repositoryService))
+	s.Serve(listener)
+	
 	CheckIfError(err)
 }

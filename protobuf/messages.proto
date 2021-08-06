@@ -45,3 +45,15 @@ message Repository {
   repeated Reference references = 3;
   Head head = 4;
 }
+
+message GetRepositoryRequest {
+  string path = 1;
+}
+
+message GetRepositoryResponse {
+  Repository repository = 1;
+}
+
+service RepositoryService {
+  rpc GetRepository(GetRepositoryRequest) returns (GetRepositoryResponse);
+}
