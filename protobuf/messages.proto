@@ -1,0 +1,47 @@
+syntax = "proto3";
+package pb;
+
+import "google/protobuf/timestamp.proto";
+option go_package = "src/protobuf";
+
+message Contact {
+  string name = 1;
+  string email = 2;
+}
+
+message Commit {
+ string hash = 1;
+ string summary = 2;
+ string body = 3;
+ Contact author = 4;
+ Contact committer = 5;
+ repeated string parents = 6;
+ google.protobuf.Timestamp commit_time = 7;
+}
+
+message Reference {
+  string name = 1;
+  string shorthand = 2;
+  string hash = 3;
+  enum Type {
+    InvalidReference=0;
+    HashReference=1;
+    SymbolicReference=2;
+  }
+  Type type = 4;
+  bool is_remote = 5;
+  bool is_branch = 6;
+}
+
+message Head {
+  string hash = 1;
+  string name = 2;
+  string shorthand = 3;
+}
+
+message Repository {
+  string id = 1;
+  repeated Commit commits = 2;
+  repeated Reference references = 3;
+  Head head = 4;
+}
