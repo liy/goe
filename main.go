@@ -15,13 +15,20 @@ import (
 	"github.com/liy/goe/src/protobuf"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
 	ts "google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var repositoryData protobuf.Repository
 
 type repositoryService struct {}
 
 func (service *repositoryService) GetRepository(ctx context.Context, req *protobuf.GetRepositoryRequest) (*protobuf.GetRepositoryResponse, error) {
-	return nil, nil
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		fmt.Println("metadata received: ", md)
+	}
+
+	return &protobuf.GetRepositoryResponse{Repository: &repositoryData}, nil
 }
 
 // CheckIfError should be used to naively panics if an error is not nil.
@@ -118,21 +125,21 @@ func main() {
 	CheckIfError(err)
 
 
-	data := protobuf.Repository {
+	repositoryData = protobuf.Repository {
 		Id: directory,
 		Commits: commits,
 		References: references,
 		Head: &head,
 	}
 
-	fmt.Println(data.Commits[0])
+	fmt.Println(repositoryData.Commits[0])
 
 	const port = ":8888"
 	listener, err := net.Listen("tcp", port)
 	CheckIfError(err)
-	credentials, err := credentials.NewServerTLSFromFile("./certificates/cert.pem", "./certificates/key.pem")
+	credentials, err := credentials.NewServerTLSFromFile("./certificates/server.pem", "./certificates/server.key")
 	CheckIfError(err)
-	opts := []grpc.ServerOption{grpc.Creds(credentials)}
+	opts := []grpc.ServerOption{grpc.Creds(credentials), grpc.MaxRecvMsgSize(20 * 1024 * 1024), grpc.MaxSendMsgSize(20 * 1024 * 1024),}
 	s := grpc.NewServer(opts...)
 	protobuf.RegisterRepositoryServiceServer(s, new(repositoryService))
 	s.Serve(listener)
