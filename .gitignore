@@ -1,7 +1,10 @@
-certificates
 repo
 src/protobuf
-
+# certificates
+certificates/*.crt
+certificates/*.key
+certificates/*.csr
+certificates/*.pem
   
 # Binaries for programs and plugins
 *.exe
