@@ -1,0 +1,3 @@
+[submodule "goe-protobuf"]
+	path = protobuf
+	url = git@github.com:liy/goe-protobuf.git
