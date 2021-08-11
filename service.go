@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,7 +19,7 @@ var repository protobuf.Repository
 
 type RepositoryService struct {}
 
-func (service *RepositoryService) GetCommits(ctx context.Context, req *protobuf.EmptyRequest) (*protobuf.GetCommitsResponse, error) {
+func (service *RepositoryService) GetHead(ctx context.Context, req *protobuf.EmptyRequest) (*protobuf.GetHeadResponse, error) {
 	md, ok :=  metadata.FromIncomingContext(ctx);
 	if !ok {
 		return nil, fmt.Errorf("cannot retrieve metadata");
@@ -29,13 +28,6 @@ func (service *RepositoryService) GetCommits(ctx context.Context, req *protobuf.
 	path := "./repo"
 	if mdValues := md.Get("path"); len(mdValues) != 0 {
 		path = mdValues[0]
-	}
-
-	batchSize := 2000
-	if mdValues := md.Get("batchSize"); len(mdValues) != 0 {
-		if value, err := strconv.Atoi(md.Get("batchSize")[0]); err != nil {
-			batchSize = value
-		}
 	}
 
 	start := time.Now()
@@ -48,64 +40,29 @@ func (service *RepositoryService) GetCommits(ctx context.Context, req *protobuf.
 	
 	// ... retrieves the branch pointed by HEAD
 	ref, err := r.Head()
+	head := protobuf.Head {
+		Hash: ref.Hash().String(),
+		Name: ref.Name().String(),
+		Shorthand: ref.Name().Short(),
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	// ... retrieves the commit history
-	cIter, err := r.Log(&git.LogOptions{From: ref.Hash(), All: true, Order: git.LogOrderCommitterTime})
-	if err != nil {
-		return nil, err
-	}
+    log.Printf("Get head took %s", time.Since(start))
 
-	commits := make([]*protobuf.Commit, batchSize)
-	err = cIter.ForEach(func(c *object.Commit) error {
-		messages := strings.Split(c.Message, "\n")
-
-		summary := messages[0]
-		body := ""
-		if len(messages) > 1 {
-			body = strings.Join(messages[1:], "\n")
-		}
-
-
-		parents := make([]string, c.NumParents()) 
-		for i, pc := range c.ParentHashes {
-			parents[i] = pc.String()
-		}
-
-		commit := protobuf.Commit {
-			Hash: c.Hash.String(),
-			Summary: summary,
-			Body: body,
-			Author: &protobuf.Contact {
-				Name: c.Author.Name,
-				Email: c.Author.Email,
-			},
-			Committer:  &protobuf.Contact {
-				Name: c.Committer.Name,
-				Email: c.Committer.Email,
-			},
-			Parents: parents,
-			CommitTime: ts.New(c.Committer.When),
-		}
-		commits = append(commits, &commit)
-		
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-    log.Printf("Log all commits took %s", time.Since(start))
-
-	return &protobuf.GetCommitsResponse{Commits: commits}, nil
+	return &protobuf.GetHeadResponse{Head: &head}, nil
 }
 
 func (service *RepositoryService) GetRepository(ctx context.Context, req *protobuf.EmptyRequest) (*protobuf.GetRepositoryResponse, error) {
+	md, ok :=  metadata.FromIncomingContext(ctx);
+	if !ok {
+		return nil, fmt.Errorf("cannot retrieve metadata");
+	}
+
 	path := "./repo"
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		path = md.Get("path")[0]
+	if mdValues := md.Get("path"); len(mdValues) != 0 {
+		path = mdValues[0]
 	}
 
 	start := time.Now()
@@ -129,9 +86,7 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 	}
 
 	// ... retrieves the commit history
-	since := time.Time{}
-	until := time.Date(2021, 9, 30, 0, 0, 0, 0, time.UTC)
-	cIter, err := r.Log(&git.LogOptions{From: ref.Hash(), Since: &since, Until: &until, Order: git.LogOrderCommitterTime})
+	cIter, err := r.Log(&git.LogOptions{From: ref.Hash(), All: true, Order: git.LogOrderCommitterTime})
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +153,6 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 		return nil, err
 	}
 
-
 	repository = protobuf.Repository {
 		Path: path,
 		Commits: commits,
@@ -210,3 +164,40 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 
 	return &protobuf.GetRepositoryResponse{Repository: &repository}, nil
 }
+
+// func (service *RepositoryService) Watch(req *protobuf.EmptyRequest, stream protobuf.RepositoryService_WatchServer ) error {
+// 	md, ok := metadata.FromIncomingContext(stream.Context()); 
+// 	if !ok {
+// 		return fmt.Errorf("cannot retrieve metadata");
+// 	}
+
+// 	// TODO: when .git folder changes check head
+
+
+// 	path := "./repo"
+// 	if mdValues := md.Get("path"); len(mdValues) != 0 {
+// 		path = mdValues[0]
+// 	}
+
+// 	// Opens an already existing repository.
+// 	r, err := git.PlainOpen(path)
+// 	if err != nil {
+// 		return fmt.Errorf("cannot open repository: %v", path)
+// 	}
+
+// 	// ... retrieves the branch pointed by HEAD
+// 	ref, err := r.Head()
+// 	head := protobuf.Head {
+// 		Hash: ref.Hash().String(),
+// 		Name: ref.Name().String(),
+// 		Shorthand: ref.Name().Short(),
+// 	}
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	stream.Send(&protobuf.WatchResponse{Head: &head})
+
+// 	return nil
+// }
+
