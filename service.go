@@ -86,7 +86,7 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 	}
 
 	// ... retrieves the commit history
-	cIter, err := r.Log(&git.LogOptions{From: ref.Hash(), All: true, Order: git.LogOrderCommitterTime})
+	cIter, err := r.Log(&git.LogOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +101,9 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 			body = strings.Join(messages[1:], "\n")
 		}
 
+		if(c.Hash.String() == "99bc896d3d914c1607b8ee99b9f2cb51e2fd2b28") {
+			fmt.Println("!!!")
+		}
 
 		parents := make([]string, c.NumParents()) 
 		for i, pc := range c.ParentHashes {
