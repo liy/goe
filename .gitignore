@@ -5,7 +5,9 @@ certificates/*.crt
 certificates/*.key
 certificates/*.csr
 certificates/*.pem
-  
+
+.vscode
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
