@@ -1,4 +1,6 @@
 repo
+repo-scratch
+
 src/protobuf
 # certificates
 certificates/*.crt

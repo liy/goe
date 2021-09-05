@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
+	"time"
 
-	"github.com/liy/goe/plumbing/indexfile"
 	"github.com/liy/goe/plumbing/packfile"
 )
 
@@ -21,14 +22,17 @@ func main() {
 
 	// CheckIfError(err)
 
-	bytes, _ := ioutil.ReadFile("C:\\Source\\git-internals\\.git\\objects\\pack\\pack-66916c151da20048086dacbba45c420c0c1de8f6.idx")
-	indexFile := new(indexfile.Index)
-	indexFile.Decode(bytes)
+	// bytes, _ := ioutil.ReadFile("C:\\Source\\git-internals\\.git\\objects\\pack\\pack-66916c151da20048086dacbba45c420c0c1de8f6.idx")
+	// indexFile := new(indexfile.Index)
+	// indexFile.Decode(bytes)
 
-	bytes, _ = ioutil.ReadFile("C:\\Source\\git-internals\\.git\\objects\\pack\\pack-66916c151da20048086dacbba45c420c0c1de8f6.pack")
+	
+	start := time.Now()
+	bytes, _ := ioutil.ReadFile(".\\repo\\.git\\objects\\pack\\pack-004ad14387e8ad228175d6e87e3281f0bd6b4d7e.pack")
 	packFile := new(packfile.Pack)
 	err := packFile.Decode(bytes)
 	if err != nil {
 		fmt.Println(err)
 	}
+    log.Printf("Log all commits took %s", time.Since(start))
 }

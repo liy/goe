@@ -77,7 +77,7 @@ func (pack *Pack) Decode(packBytes []byte) error {
 		// It is a good hint for zlib to read the data into the buffer without run into overflow problem
 		object.Data = readObject(reader, object.DeflatedSize)
 
-		fmt.Println(string(object.Data))
+		// fmt.Println(string(object.Data))
 
 		pack.Objects[i] = object
 	}
