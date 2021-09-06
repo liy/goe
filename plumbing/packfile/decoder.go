@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/binary"
-	"fmt"
 	"io"
+	"sync"
 
 	"github.com/liy/goe/plumbing"
+	"github.com/liy/goe/plumbing/indexfile"
 )
 
 // 32768 bytes zlib sliding window size
@@ -17,6 +18,11 @@ type PackObject struct {
 	Type         plumbing.ObjectType
 	Data         []byte
 	DeflatedSize int32
+}
+
+func (o *PackObject) Write(ba []byte) (int, error) {
+	o.Data = append(o.Data, ba...)
+	return len(ba), nil
 }
 
 type Pack struct {
@@ -75,7 +81,8 @@ func (pack *Pack) Decode(packBytes []byte) error {
 
 		// object size is actually inflatted data size: deflatedObjSize >= objectSize
 		// It is a good hint for zlib to read the data into the buffer without run into overflow problem
-		object.Data = readObject(reader, object.DeflatedSize)
+		// object.Data = readObject(reader, object.DeflatedSize)
+		readObject(&pack.Objects[i], reader)
 
 		// fmt.Println(string(object.Data))
 
@@ -85,34 +92,101 @@ func (pack *Pack) Decode(packBytes []byte) error {
 	return nil
 }
 
-func readObject(reader io.Reader, sizeHint int32) []byte {
-	// TODO: re-use zlib reader
-	zReader, _ := zlib.NewReader(reader)
-	buffer := new(bytes.Buffer)
-	chunkSize := sizeHint
-	if sizeHint > ZLIB_SLIDING_WINDOW_SIZE {
-		chunkSize = ZLIB_SLIDING_WINDOW_SIZE
+func (pack *Pack) DecodeWithIndex(packBytes []byte, idx *indexfile.Index) error {
+	reader := bytes.NewReader(packBytes)
+	signature := make([]byte, 4)
+	_, err := io.ReadFull(reader, signature)
+	if err != nil {
+		return err
 	}
-	for {
-		chunk := make([]byte, chunkSize)
-		// zlib has sliding window size, any data size larger than
-		// the sliding window size will require multiple read.
-		// The error returned is not strictly an error, but contains stream end information: EOF.
-		numBytesRead, err := zReader.Read(chunk)
-		buffer.Write(chunk[:numBytesRead])
+	pack.Signature = *(*[4]byte)(signature)
 
-		if err != nil {
-			// Finish reading the compressed stream correctly
-			if err.Error() == "EOF" {
-				break
-			} else {
-				fmt.Println("Error reading zlib stream", err)
-			}
+	err = binary.Read(reader, binary.BigEndian, &pack.Version)
+	if err != nil {
+		return err
+	}
+
+	pack.NumEntries = len(idx.Hashes)
+	pack.Objects = make([]PackObject, pack.NumEntries)
+
+	for i, _ := range idx.Hashes  {
+		offset := idx.GetOffset(i)
+
+		reader.Seek(offset, io.SeekStart)
+		dataByte, _ := reader.ReadByte()
+
+		var object PackObject
+
+		// msb is a flag whether to continue read byte for size construction, 3 bits for object type and 4 bits for size
+		object.Type = plumbing.ObjectType((dataByte >> 4) & 7)
+
+		// TODO: have a threshold to prevent read large object into the memory
+		object.DeflatedSize = int32(dataByte & 0x0F)
+		shift := 4
+		for dataByte&0x80 > 0 {
+			dataByte, _ = reader.ReadByte()
+			object.DeflatedSize += int32(dataByte&0x7F) << shift
+			shift += 7
 		}
-	}
-	zReader.Close()
 
-	return (*buffer).Bytes()
+		if object.Type == plumbing.OBJ_REF_DELTA {
+			baseHash := make([]byte, 20)
+			io.ReadFull(reader, baseHash)
+		} else if object.Type == plumbing.OBJ_OFS_DELTA {
+			getVariableLength(reader, 0, 0)
+		}
+
+		pack.Objects[i] = object
+	}
+
+	return nil
+}
+
+var zlibInitBytes = []byte{0x78, 0x9c, 0x01, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01}
+var zlibReaderPool = sync.Pool{
+	New: func() interface{} {
+		r, _ := zlib.NewReader(bytes.NewReader(zlibInitBytes))
+		return r
+	},
+}
+
+var zlibBufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 32*1024)
+	},
+}
+
+
+func readObject(writer *PackObject, reader io.Reader)  {
+	zReader := zlibReaderPool.Get().(io.ReadCloser)
+	zReader.(zlib.Resetter).Reset(reader, nil)
+	defer zlibReaderPool.Put(zReader)
+	defer zReader.Close()
+
+	buffer := zlibBufferPool.Get().([]byte)
+	io.CopyBuffer(writer, zReader, buffer)
+	zlibBufferPool.Put(buffer)
+
+	
+	// for {
+	// 	chunk := make([]byte, chunkSize)
+	// 	// zlib has sliding window size, any data size larger than
+	// 	// the sliding window size will require multiple read.
+	// 	// The error returned is not strictly an error, but contains stream end information: EOF.
+	// 	numBytesRead, err := zReader.Read(chunk)
+	// 	buffer.Write(chunk[:numBytesRead])
+
+	// 	if err != nil {
+	// 		// Finish reading the compressed stream correctly
+	// 		if err.Error() == "EOF" {
+	// 			break
+	// 		} else {
+	// 			fmt.Println("Error reading zlib stream", err)
+	// 		}
+	// 	}
+	// }
+
+	// return (*buffer).Bytes()
 }
 
 func getVariableLength(reader *bytes.Reader, length int32, shift int) int32 {

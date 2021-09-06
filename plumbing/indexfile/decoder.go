@@ -76,13 +76,13 @@ func (idx *Index) Decode(indexBytes []byte) error {
 	return nil
 }
 
-func (idx *Index) GetOffset(position int) uint64 {
+func (idx *Index) GetOffset(position int) int64 {
 	// Mask out the MSB to construct offset
 	offset := binary.BigEndian.Uint32(idx.Offset32[position][:]) & ^MSB_MASK_32
 	// If the MSB is set, the rest 31bit offset is actually the index to the Offset64 bytes
 	if idx.Offset32[position][0]&128 > 0 {
-		return binary.BigEndian.Uint64(idx.Offset64[offset : offset+8])
+		return int64(binary.BigEndian.Uint64(idx.Offset64[offset : offset+8]))
 	} else {
-		return uint64(offset)
+		return int64(offset)
 	}
 }
