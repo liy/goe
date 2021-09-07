@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"sync"
 
@@ -14,56 +13,6 @@ import (
 
 // 32768 bytes zlib sliding window size
 const ZLIB_SLIDING_WINDOW_SIZE = 32768
-
-type PackObject struct {
-	Type         plumbing.ObjectType
-	Data         []byte
-	DeflatedSize int64
-	Size int64
-}
-
-func (o *PackObject) Write(ba []byte) (int, error) {
-	o.Data = append(o.Data, ba...)
-	return len(ba), nil
-}
-
-func (o *PackObject) GetTypeName() string {
-	switch o.Type {
-		case plumbing.OBJ_INVALID :
-			return "OBJ_INVALID"
-		case plumbing.OBJ_COMMIT  :
-			return "OBJ_COMMIT"
-		case plumbing.OBJ_TREE    :
-			return "OBJ_TREE"
-		case plumbing.OBJ_BLOB    :
-			return "OBJ_BLOB"
-		case plumbing.OBJ_TAG     :
-			return "OBJ_TAG"
-		// 5 is reserved for future expansion
-		case plumbing.OBJ_OFS_DELTA :
-			return "OBJ_OFS_DELTA"
-		case plumbing.OBJ_REF_DELTA :
-			return "OBJ_REF_DELTA"
-		default:
-			return "error type"
-	}
-}
-
-func (o PackObject) String() string {
-	if(o.Type < 5) {
-		return fmt.Sprintf("%v %v %v\n%v\n", o.GetTypeName(), int(o.DeflatedSize), int(o.Size), string(o.Data))
-	} else {
-		return fmt.Sprintf("%v %v %v\n", o.GetTypeName(), int(o.DeflatedSize), int(o.Size))
-	}
-}
-
-type Pack struct {
-	Name       plumbing.Hash
-	Version    int32
-	Objects    []PackObject
-	Signature  [4]byte
-	NumEntries int
-}
 
 func (pack *Pack) Decode(packBytes []byte) error {
 	reader := bytes.NewReader(packBytes)

@@ -10,15 +10,6 @@ import (
 	"github.com/liy/goe/utils"
 )
 
-type Index struct {
-	Hashes   []plumbing.Hash
-	CRC      [][4]byte
-	Offset32 [][4]byte
-	Offset64 []byte
-}
-
-const MSB_MASK_32 = uint32(1) << 31
-
 func (idx *Index) Decode(indexBytes []byte) error {
 	reader := bytes.NewReader(indexBytes)
 
@@ -30,12 +21,22 @@ func (idx *Index) Decode(indexBytes []byte) error {
 		return fmt.Errorf("invalid IDX header, only version 2 supported: %q", string(magicBytes))
 	}
 
-	// Fanout, number of objects
-	// Just need total object number for now
-	reader.Seek(256*4, io.SeekCurrent)
-	var numObjects uint32
-	binary.Read(reader, binary.BigEndian, &numObjects)
+	// version
+	binary.Read(reader, binary.BigEndian, &idx.Version)
 
+	// fanout and bucket
+	binary.Read(reader, binary.BigEndian, &idx.Fanout[0])
+	idx.Buckets[0] = idx.Fanout[0]
+	for i := 1; i < 256; i++ {
+		binary.Read(reader, binary.BigEndian, &idx.Fanout[i])
+		idx.Buckets[i] = idx.Fanout[i] - idx.Fanout[i-1]
+	}
+
+	// reader.Seek(256*4 , io.SeekCurrent)
+	// var numObjects uint32
+	// binary.Read(reader, binary.BigEndian, &numObjects)
+
+	numObjects := idx.Fanout[255]
 	// hashes
 	idx.Hashes = make([]plumbing.Hash, numObjects)
 	for i := 0; i < int(numObjects); i++ {
@@ -74,15 +75,4 @@ func (idx *Index) Decode(indexBytes []byte) error {
 	}
 
 	return nil
-}
-
-func (idx *Index) GetOffset(position int) int64 {
-	// Mask out the MSB to construct offset
-	offset := binary.BigEndian.Uint32(idx.Offset32[position][:]) & ^MSB_MASK_32
-	// If the MSB is set, the rest 31bit offset is actually the index to the Offset64 bytes
-	if idx.Offset32[position][0]&128 > 0 {
-		return int64(binary.BigEndian.Uint64(idx.Offset64[offset : offset+8]))
-	} else {
-		return int64(offset)
-	}
 }

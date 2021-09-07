@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -16,8 +17,11 @@ import (
 	ts "google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const defaultPack = ".\\repo\\.git\\objects\\pack\\pack-004ad14387e8ad228175d6e87e3281f0bd6b4d7e.pack"
-const defaultPackIndex = ".\\repo\\.git\\objects\\pack\\pack-004ad14387e8ad228175d6e87e3281f0bd6b4d7e.idx"
+const defaultPack = ".\\repo-test\\.git\\objects\\pack\\pack-66916c151da20048086dacbba45c420c0c1de8f6.pack"
+const defaultPackIndex = ".\\repo-test\\.git\\objects\\pack\\pack-66916c151da20048086dacbba45c420c0c1de8f6.idx"
+
+const largePack = ".\\repo\\.git\\objects\\pack\\pack-004ad14387e8ad228175d6e87e3281f0bd6b4d7e.pack"
+const largePackIndex = ".\\repo\\.git\\objects\\pack\\pack-004ad14387e8ad228175d6e87e3281f0bd6b4d7e.idx"
 
 const scratchPack = "C://Users//liy//Workspace//goe//repo-scratch//.git//objects//pack//pack-1a1312067da0fc58cabf0a667c5fa43924928181.pack"
 const scratchPackIndex = "C://Users//liy//Workspace//goe//repo-scratch//.git//objects//pack//pack-1a1312067da0fc58cabf0a667c5fa43924928181.idx"
@@ -136,21 +140,27 @@ func main() {
 	// CheckIfError(err)
 
 	start := time.Now()
-	bytes, _ := ioutil.ReadFile(scratchPackIndex)
+	bytes, _ := ioutil.ReadFile(largePackIndex)
 	indexFile := new(indexfile.Index)
 	indexFile.Decode(bytes)
 
-	bytes, _ = ioutil.ReadFile(scratchPack)
+	bytes, _ = ioutil.ReadFile(largePack)
 	packFile := new(packfile.Pack)
-	err := packFile.DecodeWithIndex(bytes, indexFile)
+	// err := packFile.DecodeWithIndex(bytes, indexFile)
 	// err := packFile.Decode(bytes)
-	if err != nil {
-		fmt.Println(err)
-	}
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
 	
-	for _, o := range packFile.Objects {
-		fmt.Println(o)
-	}
+	// for _, o := range packFile.Objects {
+	// 	fmt.Println(o)
+	// }
 
-	log.Printf("Log all commits took %s", time.Since(start))
+	hashBytes, _ := hex.DecodeString("4f3b0254d9160fd8786d2edb3a6a73ffcf6b70ac")
+	position := indexFile.GetPosition(*(*[20]byte)(hashBytes))
+	offset := indexFile.GetOffset(position)
+	object := packFile.TestReadObjectAt(offset, bytes) 
+	fmt.Println(object)
+
+	log.Printf("Operation took %s", time.Since(start))
 }
