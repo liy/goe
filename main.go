@@ -142,10 +142,15 @@ func main() {
 
 	bytes, _ = ioutil.ReadFile(scratchPack)
 	packFile := new(packfile.Pack)
-	// err := packFile.DecodeWithIndex(bytes, indexFile)
-	err := packFile.Decode(bytes)
+	err := packFile.DecodeWithIndex(bytes, indexFile)
+	// err := packFile.Decode(bytes)
 	if err != nil {
 		fmt.Println(err)
 	}
+	
+	for _, o := range packFile.Objects {
+		fmt.Println(o)
+	}
+
 	log.Printf("Log all commits took %s", time.Since(start))
 }

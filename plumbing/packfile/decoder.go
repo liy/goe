@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"sync"
 
@@ -17,12 +18,43 @@ const ZLIB_SLIDING_WINDOW_SIZE = 32768
 type PackObject struct {
 	Type         plumbing.ObjectType
 	Data         []byte
-	DeflatedSize int32
+	DeflatedSize int64
+	Size int64
 }
 
 func (o *PackObject) Write(ba []byte) (int, error) {
 	o.Data = append(o.Data, ba...)
 	return len(ba), nil
+}
+
+func (o *PackObject) GetTypeName() string {
+	switch o.Type {
+		case plumbing.OBJ_INVALID :
+			return "OBJ_INVALID"
+		case plumbing.OBJ_COMMIT  :
+			return "OBJ_COMMIT"
+		case plumbing.OBJ_TREE    :
+			return "OBJ_TREE"
+		case plumbing.OBJ_BLOB    :
+			return "OBJ_BLOB"
+		case plumbing.OBJ_TAG     :
+			return "OBJ_TAG"
+		// 5 is reserved for future expansion
+		case plumbing.OBJ_OFS_DELTA :
+			return "OBJ_OFS_DELTA"
+		case plumbing.OBJ_REF_DELTA :
+			return "OBJ_REF_DELTA"
+		default:
+			return "error type"
+	}
+}
+
+func (o PackObject) String() string {
+	if(o.Type < 5) {
+		return fmt.Sprintf("%v %v %v\n%v\n", o.GetTypeName(), int(o.DeflatedSize), int(o.Size), string(o.Data))
+	} else {
+		return fmt.Sprintf("%v %v %v\n", o.GetTypeName(), int(o.DeflatedSize), int(o.Size))
+	}
 }
 
 type Pack struct {
@@ -64,11 +96,11 @@ func (pack *Pack) Decode(packBytes []byte) error {
 		object.Type = plumbing.ObjectType((dataByte >> 4) & 7)
 
 		// TODO: have a threshold to prevent read large object into the memory
-		object.DeflatedSize = int32(dataByte & 0x0F)
+		object.DeflatedSize = int64(dataByte & 0x0F)
 		shift := 4
 		for dataByte&0x80 > 0 {
 			dataByte, _ = reader.ReadByte()
-			object.DeflatedSize += int32(dataByte&0x7F) << shift
+			object.DeflatedSize += int64(dataByte&0x7F) << shift
 			shift += 7
 		}
 
@@ -79,12 +111,7 @@ func (pack *Pack) Decode(packBytes []byte) error {
 			getVariableLength(reader, 0, 0)
 		}
 
-		// object size is actually inflatted data size: deflatedObjSize >= objectSize
-		// It is a good hint for zlib to read the data into the buffer without run into overflow problem
-		// object.Data = readObject(reader, object.DeflatedSize)
-		readObject(&pack.Objects[i], reader)
-
-		// fmt.Println(string(object.Data))
+		object.Size, _ = readObject(&object, reader)
 
 		pack.Objects[i] = object
 	}
@@ -121,11 +148,11 @@ func (pack *Pack) DecodeWithIndex(packBytes []byte, idx *indexfile.Index) error 
 		object.Type = plumbing.ObjectType((dataByte >> 4) & 7)
 
 		// TODO: have a threshold to prevent read large object into the memory
-		object.DeflatedSize = int32(dataByte & 0x0F)
+		object.DeflatedSize = int64(dataByte & 0x0F)
 		shift := 4
 		for dataByte&0x80 > 0 {
 			dataByte, _ = reader.ReadByte()
-			object.DeflatedSize += int32(dataByte&0x7F) << shift
+			object.DeflatedSize += int64(dataByte&0x7F) << shift
 			shift += 7
 		}
 
@@ -135,6 +162,8 @@ func (pack *Pack) DecodeWithIndex(packBytes []byte, idx *indexfile.Index) error 
 		} else if object.Type == plumbing.OBJ_OFS_DELTA {
 			getVariableLength(reader, 0, 0)
 		}
+
+		object.Size, _ = readObject(&object, reader)
 
 		pack.Objects[i] = object
 	}
@@ -152,41 +181,23 @@ var zlibReaderPool = sync.Pool{
 
 var zlibBufferPool = sync.Pool{
 	New: func() interface{} {
-		return make([]byte, 32*1024)
+		bs := make([]byte, 32*1024)
+		return &bs
 	},
 }
 
 
-func readObject(writer *PackObject, reader io.Reader)  {
+func readObject(writer *PackObject, reader io.Reader) (int64, error)  {
 	zReader := zlibReaderPool.Get().(io.ReadCloser)
 	zReader.(zlib.Resetter).Reset(reader, nil)
 	defer zlibReaderPool.Put(zReader)
 	defer zReader.Close()
 
-	buffer := zlibBufferPool.Get().([]byte)
-	io.CopyBuffer(writer, zReader, buffer)
+	buffer := zlibBufferPool.Get().(*[]byte)
+	written, err := io.CopyBuffer(writer, zReader, *buffer)
 	zlibBufferPool.Put(buffer)
 
-	
-	// for {
-	// 	chunk := make([]byte, chunkSize)
-	// 	// zlib has sliding window size, any data size larger than
-	// 	// the sliding window size will require multiple read.
-	// 	// The error returned is not strictly an error, but contains stream end information: EOF.
-	// 	numBytesRead, err := zReader.Read(chunk)
-	// 	buffer.Write(chunk[:numBytesRead])
-
-	// 	if err != nil {
-	// 		// Finish reading the compressed stream correctly
-	// 		if err.Error() == "EOF" {
-	// 			break
-	// 		} else {
-	// 			fmt.Println("Error reading zlib stream", err)
-	// 		}
-	// 	}
-	// }
-
-	// return (*buffer).Bytes()
+	return written, err
 }
 
 func getVariableLength(reader *bytes.Reader, length int32, shift int) int32 {
