@@ -1,20 +1,15 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/liy/goe/plumbing/indexfile"
+	goplumbing "github.com/go-git/go-git/v5/plumbing"
+	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/plumbing/packfile"
 	"github.com/liy/goe/src/protobuf"
-	ts "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const defaultPack = ".\\repo-test\\.git\\objects\\pack\\pack-66916c151da20048086dacbba45c420c0c1de8f6.pack"
@@ -49,48 +44,71 @@ func testRepository() error {
 	}
 
 	// ... retrieves the commit history
-	cIter, err := r.Log(&git.LogOptions{All: true})
-	if err != nil {
-		return err
-	}
+	// cIter, err := r.Log(&git.LogOptions{All: true})
+	// if err != nil {
+	// 	return err
+	// }
 
 	var commits []*protobuf.Commit
-	err = cIter.ForEach(func(c *object.Commit) error {
-		messages := strings.Split(c.Message, "\n")
+	// err = cIter.ForEach(func(c *object.Commit) error {
+	// 	messages := strings.Split(c.Message, "\n")
 
-		summary := messages[0]
-		body := ""
-		if len(messages) > 1 {
-			body = strings.Join(messages[1:], "\n")
-		}
+	// 	summary := messages[0]
+	// 	body := ""
+	// 	if len(messages) > 1 {
+	// 		body = strings.Join(messages[1:], "\n")
+	// 	}
 
-		parents := make([]string, c.NumParents())
-		for i, pc := range c.ParentHashes {
-			parents[i] = pc.String()
-		}
+	// 	parents := make([]string, c.NumParents())
+	// 	for i, pc := range c.ParentHashes {
+	// 		parents[i] = pc.String()
+	// 	}
 
-		commit := protobuf.Commit{
-			Hash:    c.Hash.String(),
-			Summary: summary,
-			Body:    body,
-			Author: &protobuf.Contact{
-				Name:  c.Author.Name,
-				Email: c.Author.Email,
-			},
-			Committer: &protobuf.Contact{
-				Name:  c.Committer.Name,
-				Email: c.Committer.Email,
-			},
-			Parents:    parents,
-			CommitTime: ts.New(c.Committer.When),
-		}
-		commits = append(commits, &commit)
+	// 	commit := protobuf.Commit{
+	// 		Hash:    c.Hash.String(),
+	// 		Summary: summary,
+	// 		Body:    body,
+	// 		Author: &protobuf.Contact{
+	// 			Name:  c.Author.Name,
+	// 			Email: c.Author.Email,
+	// 		},
+	// 		Committer: &protobuf.Contact{
+	// 			Name:  c.Committer.Name,
+	// 			Email: c.Committer.Email,
+	// 		},
+	// 		Parents:    parents,
+	// 		CommitTime: ts.New(c.Committer.When),
+	// 	}
+	// 	commits = append(commits, &commit)
 
-		return nil
-	})
+	// 	return nil
+	// })
+	_, err = r.CommitObject(goplumbing.NewHash("4f3b0254d9160fd8786d2edb3a6a73ffcf6b70ac"))
 	if err != nil {
 		return err
 	}
+	// _, err = r.CommitObject(goplumbing.NewHash("8e0228daabdc4708fb3f333fb869de84d5ed7d01"))
+	// if err != nil {
+	// 	return err
+	// }
+	// _, err = r.CommitObject(goplumbing.NewHash("ff46c79f1154922d155dcd7b1d18027ab265b2fa"))
+	// if err != nil {
+	// 	return err
+	// }
+	// _, err = r.CommitObject(goplumbing.NewHash("7d9095383a9a222fa3ba82eb8a803bcb338ad946"))
+	// if err != nil {
+	// 	return err
+	// }
+	// _, err = r.CommitObject(goplumbing.NewHash("77ace532f338d733006de2a34783201ca9d2bcc8"))
+	// if err != nil {
+	// 	return err
+	// }
+	// _, err = r.CommitObject(goplumbing.NewHash("1d90bf4d8d24d47e5fb3ac07aabf5242c96a6c31"))
+	// if err != nil {
+	// 	return err
+	// }
+
+	// fmt.Println(commit)
 
 	var references []*protobuf.Reference
 	rIter, err := r.References()
@@ -98,7 +116,7 @@ func testRepository() error {
 		return err
 	}
 
-	err = rIter.ForEach(func(r *plumbing.Reference) error {
+	err = rIter.ForEach(func(r *goplumbing.Reference) error {
 		ref := protobuf.Reference{
 			Name:      r.Name().String(),
 			Shorthand: r.Name().Short(),
@@ -139,28 +157,43 @@ func main() {
 	// s.Serve(listener)
 	// CheckIfError(err)
 
+
 	start := time.Now()
-	bytes, _ := ioutil.ReadFile(largePackIndex)
-	indexFile := new(indexfile.Index)
-	indexFile.Decode(bytes)
+	packReader := packfile.NewPackReader(largePack)
 
-	bytes, _ = ioutil.ReadFile(largePack)
-	packFile := new(packfile.Pack)
-	// err := packFile.DecodeWithIndex(bytes, indexFile)
-	// err := packFile.Decode(bytes)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	
-	// for _, o := range packFile.Objects {
-	// 	fmt.Println(o)
-	// }
+	object, err := packReader.GetObject(plumbing.ToHash("4f3b0254d9160fd8786d2edb3a6a73ffcf6b70ac"))
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	hashBytes, _ := hex.DecodeString("4f3b0254d9160fd8786d2edb3a6a73ffcf6b70ac")
-	position := indexFile.GetPosition(*(*[20]byte)(hashBytes))
-	offset := indexFile.GetOffset(position)
-	object := packFile.TestReadObjectAt(offset, bytes) 
+	object, err = packReader.GetObject(plumbing.ToHash("4f3b0254d9160fd8786d2edb3a6a73ffcf6b70ac"))
+	if err != nil {
+		fmt.Println(err)
+	}
 	fmt.Println(object)
 
+	_, err = packReader.GetObject(plumbing.ToHash("8e0228daabdc4708fb3f333fb869de84d5ed7d01"))
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	_, err = packReader.GetObject(plumbing.ToHash("ff46c79f1154922d155dcd7b1d18027ab265b2fa"))
+	if err != nil {
+		fmt.Println(err)
+	}
+	
+	_, err = packReader.GetObject(plumbing.ToHash("7d9095383a9a222fa3ba82eb8a803bcb338ad946"))
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	_, err = packReader.GetObject(plumbing.ToHash("77ace532f338d733006de2a34783201ca9d2bcc8"))
+	if err != nil {
+		fmt.Println(err)
+	}
 	log.Printf("Operation took %s", time.Since(start))
+	
+	
+	
+	// testRepository()
 }

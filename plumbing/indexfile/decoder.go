@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/utils"
 )
 
-func (idx *Index) Decode(indexBytes []byte) error {
+func Decode(indexBytes []byte) (*Index, error) {
+	idx := new(Index)
 	reader := bytes.NewReader(indexBytes)
 
 	// Check magic header
@@ -18,61 +18,67 @@ func (idx *Index) Decode(indexBytes []byte) error {
 	_, err := io.ReadFull(reader, magicBytes)
 	utils.CheckIfError(err)
 	if string(magicBytes) != "\377tOc" {
-		return fmt.Errorf("invalid IDX header, only version 2 supported: %q", string(magicBytes))
+		return nil, fmt.Errorf("invalid IDX header, only version 2 supported: %q", string(magicBytes))
 	}
 
 	// version
-	binary.Read(reader, binary.BigEndian, &idx.Version)
+	err = binary.Read(reader, binary.BigEndian, &idx.Version)
+	if err != nil {
+		return nil, err
+	}
 
 	// fanout and bucket
-	binary.Read(reader, binary.BigEndian, &idx.Fanout[0])
+	err = binary.Read(reader, binary.BigEndian, &idx.Fanout[0])
+	if err != nil {
+		return nil, err
+	}
 	idx.Buckets[0] = idx.Fanout[0]
 	for i := 1; i < 256; i++ {
-		binary.Read(reader, binary.BigEndian, &idx.Fanout[i])
+		err = binary.Read(reader, binary.BigEndian, &idx.Fanout[i])
+		if err != nil {
+			return nil, err
+		}
 		idx.Buckets[i] = idx.Fanout[i] - idx.Fanout[i-1]
 	}
 
-	// reader.Seek(256*4 , io.SeekCurrent)
-	// var numObjects uint32
-	// binary.Read(reader, binary.BigEndian, &numObjects)
-
-	numObjects := idx.Fanout[255]
+	idx.NumObjects = idx.Fanout[255]
 	// hashes
-	idx.Hashes = make([]plumbing.Hash, numObjects)
-	for i := 0; i < int(numObjects); i++ {
-		bytes := make([]byte, 20)
-		_, err := io.ReadFull(reader, bytes)
-		utils.CheckIfError(err)
-		idx.Hashes[i] = *(*[20]byte)(bytes)
+	idx.Hashes = make([]byte, idx.NumObjects*20)
+	_, err = io.ReadFull(reader, idx.Hashes)
+	if err != nil {
+		return nil, err
 	}
 
 	// crc
-	idx.CRC = make([][4]byte, numObjects)
-	for i := 0; i < int(numObjects); i++ {
-		bytes := make([]byte, 4)
-		_, err := io.ReadFull(reader, bytes)
-		utils.CheckIfError(err)
-		idx.CRC[i] = *(*[4]byte)(bytes)
+	idx.CRC = make([]byte, idx.NumObjects*4)
+	_, err = io.ReadFull(reader, idx.CRC)
+	if err != nil {
+		return nil, err
 	}
 
-	// offsets, 32 and 64
+	// offsets 32 
+	idx.Offset32 = make([]byte, idx.NumObjects*4)
+	_, err = io.ReadFull(reader, idx.Offset32)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Check if any offset64, msb is 1
 	var numOffset64 int
-	idx.Offset32 = make([][4]byte, numObjects)
-	for i := 0; i < int(numObjects); i++ {
-		bytes := make([]byte, 4)
-		_, err := io.ReadFull(reader, bytes)
-		utils.CheckIfError(err)
-		idx.Offset32[i] = *(*[4]byte)(bytes)
-
-		if bytes[0]&128 > 0 {
+	for i := 0; i < int(idx.NumObjects); i+=4 {
+		if idx.Offset32[i]&128 > 0 {
 			numOffset64++
 		}
 	}
-	// offset 64 if any
+
+	// offset 64
 	if numOffset64 > 0 {
 		idx.Offset64 = make([]byte, numOffset64*8)
-		io.ReadFull(reader, idx.Offset64)
+		_, err = io.ReadFull(reader, idx.Offset64)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return nil
+	return idx, nil
 }

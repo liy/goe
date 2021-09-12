@@ -1,90 +1,101 @@
 package packfile
 
 import (
-	"bytes"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/liy/goe/plumbing"
+	"github.com/liy/goe/plumbing/indexfile"
+	"github.com/liy/goe/utils"
 )
-
-type PackObject struct {
-	Type         plumbing.ObjectType
-	Data         []byte
-	DeflatedSize int64
-	Size         int64
-}
-
-func (o *PackObject) Write(ba []byte) (int, error) {
-	o.Data = append(o.Data, ba...)
-	return len(ba), nil
-}
-
-func (o *PackObject) GetTypeName() string {
-	switch o.Type {
-	case plumbing.OBJ_INVALID:
-		return "OBJ_INVALID"
-	case plumbing.OBJ_COMMIT:
-		return "OBJ_COMMIT"
-	case plumbing.OBJ_TREE:
-		return "OBJ_TREE"
-	case plumbing.OBJ_BLOB:
-		return "OBJ_BLOB"
-	case plumbing.OBJ_TAG:
-		return "OBJ_TAG"
-	// 5 is reserved for future expansion
-	case plumbing.OBJ_OFS_DELTA:
-		return "OBJ_OFS_DELTA"
-	case plumbing.OBJ_REF_DELTA:
-		return "OBJ_REF_DELTA"
-	default:
-		return "error type"
-	}
-}
-
-func (o PackObject) String() string {
-	if o.Type < 5 {
-		return fmt.Sprintf("%v %v %v\n%v\n", o.GetTypeName(), int(o.DeflatedSize), int(o.Size), string(o.Data))
-	} else {
-		return fmt.Sprintf("%v %v %v\n", o.GetTypeName(), int(o.DeflatedSize), int(o.Size))
-	}
-}
 
 type Pack struct {
 	Name       plumbing.Hash
 	Version    int32
-	Objects    []PackObject
+	Objects    []*plumbing.RawObject
 	Signature  [4]byte
 	NumEntries int
 }
 
-func (pack *Pack) TestReadObjectAt(offset int64, packBytes []byte) PackObject {
-	reader := bytes.NewReader(packBytes)
-	reader.Seek(offset, io.SeekStart)
-	dataByte, _ := reader.ReadByte()
+type PackReader struct {
+	*indexfile.Index
+	file io.ReadSeeker
+	path string
+	cache utils.Cache
+	s []byte
+}
 
-	var object PackObject
+func NewPackReader(packPath string) *PackReader {
+	file, _ := os.Open(packPath)
+	return &PackReader{
+		Index: indexfile.NewIndex(packPath[:len(packPath)-4] + "idx"),
+		file: file,
+		path: packPath,
+		cache: utils.NewLRU(int64(1 * 1024 * 1024)),
+		s: make([]byte, 1),
+	}
+}
 
-	// msb is a flag whether to continue read byte for size construction, 3 bits for object type and 4 bits for size
-	object.Type = plumbing.ObjectType((dataByte >> 4) & 7)
+func (pr *PackReader) ReadByte() (byte, error) {
+	_, err := pr.file.Read(pr.s)
+	return pr.s[0], err
+}
 
-	// TODO: have a threshold to prevent read large object into the memory
-	object.DeflatedSize = int64(dataByte & 0x0F)
+func (pr *PackReader) Read(b []byte) (int, error) {
+	return pr.file.Read(b)
+}
+
+func (pr *PackReader) Seek(offset int64, whence int) (int64, error) {
+	return pr.file.Seek(offset, whence)
+}
+
+func (pr *PackReader) ReadObjectAt(offset int64, raw *plumbing.RawObject)  error {
+	pr.Seek(offset, io.SeekStart)
+	dataByte, _ := pr.ReadByte()
+
+	// msb is a flag whether to continue read byte for size construction, 3 bits for raw type and 4 bits for size
+	raw.Type = plumbing.ObjectType((dataByte >> 4) & 7)
+
+	// TODO: have a threshold to prevent read large raw into the memory
+	raw.DeflatedSize = int64(dataByte & 0x0F)
 	shift := 4
 	for dataByte&0x80 > 0 {
-		dataByte, _ = reader.ReadByte()
-		object.DeflatedSize += int64(dataByte&0x7F) << shift
+		dataByte, _ = pr.ReadByte()
+		raw.DeflatedSize += int64(dataByte&0x7F) << shift
 		shift += 7
 	}
 
-	if object.Type == plumbing.OBJ_REF_DELTA {
+	// TODO: un-delta the delta raw 
+	if raw.Type == plumbing.OBJ_REF_DELTA {
 		baseHash := make([]byte, 20)
-		io.ReadFull(reader, baseHash)
-	} else if object.Type == plumbing.OBJ_OFS_DELTA {
-		getVariableLength(reader, 0, 0)
+		io.ReadFull(pr, baseHash)
+	} else if raw.Type == plumbing.OBJ_OFS_DELTA {
+		getVariableLength(pr, 0, 0)
 	}
 
-	object.Size, _ = readObject(&object, reader)
+	_, err := deflateObject(raw, pr)
 
-	return object
+	return err
+}
+
+func (pr *PackReader) GetObject(hash plumbing.Hash) (*plumbing.RawObject, error) {
+	item, ok := pr.cache.Get(hash)
+	if ok {
+		return item.(*plumbing.RawObject), nil
+	}
+
+	offset, ok := pr.Index.GetOffset(hash)
+	if !ok  {
+		return nil, fmt.Errorf("cannot find %s raw object in pack: %s",  hash.Short(), pr.path)
+	}
+
+	raw := plumbing.NewRawObject(hash)
+	err := pr.ReadObjectAt(offset, raw)
+	if err != nil {
+		return nil, err
+	}
+	pr.cache.Add(raw)
+
+	return raw, nil
 }
