@@ -55,10 +55,10 @@ func (pack *Pack) Decode(packBytes []byte, idx *indexfile.Index) error {
 			baseHash := make([]byte, 20)
 			io.ReadFull(reader, baseHash)
 		} else if object.Type == plumbing.OBJ_OFS_DELTA {
-			getVariableLength(reader, 0, 0)
+			ReadVariableLength(reader)
 		}
 
-		deflateObject(object, reader)
+		decompressObjectData(object, reader)
 
 		pack.Objects[i] = object
 	}
@@ -66,17 +66,44 @@ func (pack *Pack) Decode(packBytes []byte, idx *indexfile.Index) error {
 	return nil
 }
 
-func getVariableLength(reader ByteReader, length int32, shift int) int32 {
-	dataByte, _ := reader.ReadByte()
-	for dataByte&0x80 > 0 {
-		length += (int32(dataByte&0x7F) << shift)
-		shift += 7
-		dataByte, _ = reader.ReadByte()
+// Variable length encoding, with add 1 encoding
+func ReadVariableLength(reader ByteReader) int64 {
+	b, _ := reader.ReadByte()
+
+	var v = int64(b & 0x7F)
+	for b & 0x80 > 0 {
+		v++
+		
+		b, _ = reader.ReadByte()
+		v = (v << 7) + int64(b & 0x7F)
 	}
 
-	return length
+	return v
 }
 
+// Variable size encoding, without 1 encoding, little endian
+// This is used for reading delta deflated base size and deflated object size
+func ReadVariableLengthLE(reader ByteReader) int64 {
+	b, _ := reader.ReadByte()
+
+	var v = int64(b & 0x7F)
+	shift := 7
+	for b & 0x80 > 0 {
+		
+		b, _ = reader.ReadByte()
+		v = int64(b & 0x7F) << shift + v
+		shift += 7
+	}
+
+	return v
+}
+
+func SkipVariableSize(reader ByteReader) {
+	b, _ := reader.ReadByte()
+	for b & 0x80 > 0 {
+		b, _ = reader.ReadByte()
+	}
+}
 
 // func Decode(packBytes []byte) (*Pack, error) {
 // 	pack := new(Pack)

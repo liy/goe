@@ -19,6 +19,8 @@ type Index struct {
 	Offset64 []byte
 	Version uint32
 	NumObjects uint32
+	// Reverse maps offset to hash index
+	ReverseHash map[uint64]uint32
 }
 
 func NewIndex(path string) *Index{
@@ -44,6 +46,15 @@ func (idx *Index) GetHash(position int) []byte {
 	return idx.Hashes[i : i+20]
 }
 
+func (idx *Index) GetHashFromOffset(offset uint64) ([]byte, bool) {
+	position, ok := idx.ReverseHash[offset]
+	if !ok {
+		return nil, false
+	}
+	return idx.GetHash(int(position)), true
+}
+
+// TODO: cache this
 // search for offset from object hash
 /**
 1. Extract msb byte which gives the index to the fanout table

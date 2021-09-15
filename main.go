@@ -159,38 +159,13 @@ func main() {
 
 
 	start := time.Now()
-	packReader := packfile.NewPackReader(largePack)
+	packReader := packfile.NewPackReader(defaultPack)
 
-	object, err := packReader.GetObject(plumbing.ToHash("4f3b0254d9160fd8786d2edb3a6a73ffcf6b70ac"))
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	object, err = packReader.GetObject(plumbing.ToHash("4f3b0254d9160fd8786d2edb3a6a73ffcf6b70ac"))
+	object, err := packReader.ReadObject(plumbing.ToHash("7452f6dc1b06a0603d27b25cc8fa645426f07771"))
 	if err != nil {
 		fmt.Println(err)
 	}
 	fmt.Println(object)
-
-	_, err = packReader.GetObject(plumbing.ToHash("8e0228daabdc4708fb3f333fb869de84d5ed7d01"))
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	_, err = packReader.GetObject(plumbing.ToHash("ff46c79f1154922d155dcd7b1d18027ab265b2fa"))
-	if err != nil {
-		fmt.Println(err)
-	}
-	
-	_, err = packReader.GetObject(plumbing.ToHash("7d9095383a9a222fa3ba82eb8a803bcb338ad946"))
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	_, err = packReader.GetObject(plumbing.ToHash("77ace532f338d733006de2a34783201ca9d2bcc8"))
-	if err != nil {
-		fmt.Println(err)
-	}
 	log.Printf("Operation took %s", time.Since(start))
 	
 	

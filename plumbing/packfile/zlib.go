@@ -5,8 +5,6 @@ import (
 	"compress/zlib"
 	"io"
 	"sync"
-
-	"github.com/liy/goe/plumbing"
 )
 
 var zlibInitBytes = []byte{0x78, 0x9c, 0x01, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01}
@@ -25,7 +23,7 @@ var zlibBufferPool = sync.Pool{
 	},
 }
 
-func deflateObject(raw *plumbing.RawObject, reader io.Reader) (int64, error) {
+func decompressObjectData(raw io.Writer, reader io.Reader) (int64, error) {
 	zReader := zlibReaderPool.Get().(io.ReadCloser)
 	zReader.(zlib.Resetter).Reset(reader, nil)
 	defer zlibReaderPool.Put(zReader)

@@ -52,6 +52,10 @@ func (h *Hash) Short() string {
 
 func ToHash(hash string) Hash {
 	bs, _ := hex.DecodeString(hash)
+	return NewHash(bs)
+}
+
+func NewHash(bs []byte) Hash {
 	return *(*[20]byte)(bs)
 }
 

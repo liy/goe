@@ -80,5 +80,12 @@ func Decode(indexBytes []byte) (*Index, error) {
 		}
 	}
 
+	// For reverse hash lookup, using offset
+	idx.ReverseHash = make(map[uint64]uint32, idx.NumObjects)
+	for i := 0; i < int(idx.NumObjects); i++ {
+		offset := idx.getOffset(i)
+		idx.ReverseHash[uint64(offset)] = uint32(i)
+	}
+	
 	return idx, nil
 }
