@@ -75,18 +75,13 @@ func NewRawObject(hash Hash) *RawObject {
 	}
 }
 
-// Used by zlib deflate process for writing object 
 func (o *RawObject) Write(ba []byte) (int, error) {
 	o.Data = append(o.Data, ba...)
 	return len(ba), nil
 }
 
 func (o RawObject) String() string {
-	if o.Type < 5 {
-		return fmt.Sprintf("%v %v\n%v\n", o.Type, int(o.DeflatedSize), string(o.Data))
-	} else {
-		return fmt.Sprintf("%v %v\n", o.Type, int(o.DeflatedSize))
-	}
+	return fmt.Sprintf("%v\n%v %v %v", string(o.Data), o.Type, o.DeflatedSize, o.PackedSize)
 }
 
 func (o *RawObject) Hash() Hash {

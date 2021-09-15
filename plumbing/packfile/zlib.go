@@ -23,14 +23,14 @@ var zlibBufferPool = sync.Pool{
 	},
 }
 
-func decompressObjectData(raw io.Writer, reader io.Reader) (int64, error) {
+func decompressObjectData(dst io.Writer, reader io.Reader) (int64, error) {
 	zReader := zlibReaderPool.Get().(io.ReadCloser)
 	zReader.(zlib.Resetter).Reset(reader, nil)
 	defer zlibReaderPool.Put(zReader)
 	defer zReader.Close()
 
 	buffer := zlibBufferPool.Get().(*[]byte)
-	written, err := io.CopyBuffer(raw, zReader, *buffer)
+	written, err := io.CopyBuffer(dst, zReader, *buffer)
 	zlibBufferPool.Put(buffer)
 
 	return written, err

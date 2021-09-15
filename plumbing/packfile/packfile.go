@@ -19,26 +19,6 @@ type Pack struct {
 	NumEntries int
 }
 
-type BaseObject struct {
-	raw *plumbing.RawObject
-	Offset int64
-}
-
-func NewBaseObject(raw *plumbing.RawObject, offset int64) *BaseObject{
-	return &BaseObject{
-		raw,
-		offset,
-	}
-}
-
-func (b *BaseObject) Hash() plumbing.Hash {
-	return b.raw.Hash()
-}
-
-func (b *BaseObject) Size() int64 {
-	return b.raw.DeflatedSize
-} 
-
 type PackReader struct {
 	*indexfile.Index
 	file io.ReadSeeker
@@ -81,13 +61,13 @@ func (pr *PackReader) ReadObjectAt(offset int64, raw *plumbing.RawObject) error 
 
 	// TODO: have a threshold to prevent read large raw into the memory
 	raw.DeflatedSize = int64(dataByte & 0x0F)
-	raw.PackedSize = raw.DeflatedSize
 	shift := 4
 	for dataByte&0x80 > 0 {
 		dataByte, _ = pr.ReadByte()
 		raw.DeflatedSize += int64(dataByte&0x7F) << shift
 		shift += 7
 	}
+	raw.PackedSize = raw.DeflatedSize
 
 	if raw.Type == plumbing.OBJ_REF_DELTA {
 		hb := make([]byte, 20)
@@ -112,7 +92,7 @@ func (pr *PackReader) ReadObjectAt(offset int64, raw *plumbing.RawObject) error 
 
 		baseReader := bytes.NewReader(rawBase.Data)
 
-		raw.Data, err = pr.DeltaPatch(buffer, baseReader)
+		err = pr.DeltaPatch(buffer, baseReader, raw)
 		if err != nil {
 			return err
 		}
@@ -152,9 +132,7 @@ func (pr *PackReader) ReadObjectAt(offset int64, raw *plumbing.RawObject) error 
 		raw.DeflatedSize = ReadVariableLengthLE(buffer)
 
 		baseReader := bytes.NewReader(rawBase.Data)
-
-		var err error
-		raw.Data, err = pr.DeltaPatch(buffer, baseReader)
+		err := pr.DeltaPatch(buffer, baseReader, raw)
 		if err != nil {
 			return err
 		}
@@ -186,9 +164,7 @@ func (pr *PackReader) ReadObject(hash plumbing.Hash) (*plumbing.RawObject, error
 	return raw, nil
 }
 
-func (pr *PackReader) DeltaPatch(deltaReader ByteReader, baseReader *bytes.Reader) ([]byte, error) {
-	var result []byte
-	
+func (pr *PackReader) DeltaPatch(deltaReader ByteReader, baseReader *bytes.Reader, dest io.Writer) error {	
 	// Reconstruct the object data from base object
 	for {
 		cmdByte, _ := deltaReader.ReadByte()
@@ -231,10 +207,9 @@ func (pr *PackReader) DeltaPatch(deltaReader ByteReader, baseReader *bytes.Reade
 				size = 0x10000
 			}
 
-			data := make([]byte, size)
-			baseReader.ReadAt(data, int64(offset))
-			result = append(result, data...)
-			fmt.Println("copy", offset, size)
+			baseReader.Seek(int64(offset), io.SeekStart)
+			io.CopyN(dest, baseReader, int64(size))
+			// fmt.Println("copy", offset, size)
 		} else if (cmdByte & 0x80) == 0 && cmdByte != 0 { // insert
 			fmt.Println("insert")
 		} else { // end of delta
@@ -243,5 +218,5 @@ func (pr *PackReader) DeltaPatch(deltaReader ByteReader, baseReader *bytes.Reade
 		}
 	}
 
-	return result, nil
+	return nil
 }
