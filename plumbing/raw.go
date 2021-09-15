@@ -64,6 +64,9 @@ type RawObject struct {
 	Type         ObjectType
 	Data         []byte
 	DeflatedSize int64
+	// Size of the object in the pack file.
+	// It might be different from the real "DeflatedSize"
+	PackedSize int64
 }
 
 func NewRawObject(hash Hash) *RawObject {
