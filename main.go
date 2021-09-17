@@ -159,9 +159,9 @@ func main() {
 
 
 	start := time.Now()
-	packReader := packfile.NewPackReader(defaultPack)
+	packReader := packfile.NewPackReader(largePack)
 
-	object, err := packReader.ReadObject(plumbing.ToHash("7452f6dc1b06a0603d27b25cc8fa645426f07771"))
+	object, err := packReader.ReadObject(plumbing.ToHash("f9a08e80a692542cb94be651a61f81dd7374b39f"))
 	if err != nil {
 		fmt.Println(err)
 	}

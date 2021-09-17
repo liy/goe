@@ -98,12 +98,7 @@ func ReadVariableLengthLE(reader ByteReader) int64 {
 	return v
 }
 
-func SkipVariableSize(reader ByteReader) {
-	b, _ := reader.ReadByte()
-	for b & 0x80 > 0 {
-		b, _ = reader.ReadByte()
-	}
-}
+
 
 // func Decode(packBytes []byte) (*Pack, error) {
 // 	pack := new(Pack)

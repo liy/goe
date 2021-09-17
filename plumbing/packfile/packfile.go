@@ -164,11 +164,11 @@ func (pr *PackReader) ReadObject(hash plumbing.Hash) (*plumbing.RawObject, error
 	return raw, nil
 }
 
-func (pr *PackReader) DeltaPatch(deltaReader ByteReader, baseReader *bytes.Reader, dest io.Writer) error {	
+func (pr *PackReader) DeltaPatch(deltaReader *bytes.Buffer, baseReader *bytes.Reader, dest io.Writer) error {	
 	// Reconstruct the object data from base object
 	for {
 		cmdByte, _ := deltaReader.ReadByte()
-		// copy
+		// copy from base object
 		if (cmdByte & 0x80) != 0 {
 			// decode offset
 			var offset uint32
@@ -209,9 +209,12 @@ func (pr *PackReader) DeltaPatch(deltaReader ByteReader, baseReader *bytes.Reade
 
 			baseReader.Seek(int64(offset), io.SeekStart)
 			io.CopyN(dest, baseReader, int64(size))
-			// fmt.Println("copy", offset, size)
-		} else if (cmdByte & 0x80) == 0 && cmdByte != 0 { // insert
-			fmt.Println("insert")
+			fmt.Println("copy from base", offset, size)
+		} else if (cmdByte & 0x80) == 0 && cmdByte != 0 { // copy from data after command byte
+			fmt.Println("copy from command")
+			size := uint(cmdByte)
+			// Read out the size of the data to be inserted, the data is followed
+			io.CopyN(dest, deltaReader, int64(size))
 		} else { // end of delta
 			fmt.Println("end")
 			break;
