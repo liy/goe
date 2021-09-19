@@ -1,7 +1,18 @@
 package object
 
-import "github.com/liy/goe/plumbing"
+import (
+	"bufio"
+	"sync"
+
+	"github.com/liy/goe/plumbing"
+)
 
 type Object interface {
-	Parse(raw *plumbing.RawObject) error
+	Decode(raw *plumbing.RawObject) error
+}
+
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return bufio.NewReader(nil)
+	},
 }

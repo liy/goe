@@ -46,8 +46,12 @@ func (h *Hash) Bytes() *[20]byte {
 	return (*[20]byte)(h)
 }
 
-func (h *Hash) Short() string {
-	return hex.EncodeToString(h.Bytes()[:])[:6]
+func (h Hash) Short() string {
+	return hex.EncodeToString(h[:])[:6]
+}
+
+func (h Hash) String() string {
+	return hex.EncodeToString(h[:])
 }
 
 func ToHash(hash string) Hash {
@@ -56,7 +60,10 @@ func ToHash(hash string) Hash {
 }
 
 func NewHash(bs []byte) Hash {
-	return *(*[20]byte)(bs)
+	var h Hash
+	copy(h[:], bs)
+
+	return h
 }
 
 type RawObject struct {

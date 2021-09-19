@@ -7,9 +7,8 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	goplumbing "github.com/go-git/go-git/v5/plumbing"
+	goe "github.com/liy/goe/git"
 	"github.com/liy/goe/plumbing"
-	"github.com/liy/goe/plumbing/packfile"
-	"github.com/liy/goe/src/protobuf"
 )
 
 const defaultPack = ".\\repo-test\\.git\\objects\\pack\\pack-66916c151da20048086dacbba45c420c0c1de8f6.pack"
@@ -33,15 +32,15 @@ func testRepository() error {
 	}
 
 	// ... retrieves the branch pointed by HEAD
-	ref, err := r.Head()
-	head := protobuf.Head{
-		Hash:      ref.Hash().String(),
-		Name:      ref.Name().String(),
-		Shorthand: ref.Name().Short(),
-	}
-	if err != nil {
-		return err
-	}
+	// ref, err := r.Head()
+	// head := protobuf.Head{
+	// 	Hash:      ref.Hash().String(),
+	// 	Name:      ref.Name().String(),
+	// 	Shorthand: ref.Name().Short(),
+	// }
+	// if err != nil {
+	// 	return err
+	// }
 
 	// ... retrieves the commit history
 	// cIter, err := r.Log(&git.LogOptions{All: true})
@@ -49,7 +48,7 @@ func testRepository() error {
 	// 	return err
 	// }
 
-	var commits []*protobuf.Commit
+	// var commits []*protobuf.Commit
 	// err = cIter.ForEach(func(c *object.Commit) error {
 	// 	messages := strings.Split(c.Message, "\n")
 
@@ -83,10 +82,11 @@ func testRepository() error {
 
 	// 	return nil
 	// })
-	_, err = r.CommitObject(goplumbing.NewHash("4f3b0254d9160fd8786d2edb3a6a73ffcf6b70ac"))
+	c, err := r.CommitObject(goplumbing.NewHash("4f3b0254d9160fd8786d2edb3a6a73ffcf6b70ac"))
 	if err != nil {
 		return err
 	}
+	fmt.Println(c)
 	// _, err = r.CommitObject(goplumbing.NewHash("8e0228daabdc4708fb3f333fb869de84d5ed7d01"))
 	// if err != nil {
 	// 	return err
@@ -110,34 +110,34 @@ func testRepository() error {
 
 	// fmt.Println(commit)
 
-	var references []*protobuf.Reference
-	rIter, err := r.References()
-	if err != nil {
-		return err
-	}
+	// var references []*protobuf.Reference
+	// rIter, err := r.References()
+	// if err != nil {
+	// 	return err
+	// }
 
-	err = rIter.ForEach(func(r *goplumbing.Reference) error {
-		ref := protobuf.Reference{
-			Name:      r.Name().String(),
-			Shorthand: r.Name().Short(),
-			Hash:      r.Hash().String(),
-			Type:      protobuf.Reference_Type(r.Type()),
-			IsRemote:  r.Target().IsRemote(),
-			IsBranch:  r.Target().IsBranch(),
-		}
-		references = append(references, &ref)
-		return nil
-	})
-	if err != nil {
-		return err
-	}
+	// err = rIter.ForEach(func(r *goplumbing.Reference) error {
+	// 	ref := protobuf.Reference{
+	// 		Name:      r.Name().String(),
+	// 		Shorthand: r.Name().Short(),
+	// 		Hash:      r.Hash().String(),
+	// 		Type:      protobuf.Reference_Type(r.Type()),
+	// 		IsRemote:  r.Target().IsRemote(),
+	// 		IsBranch:  r.Target().IsBranch(),
+	// 	}
+	// 	references = append(references, &ref)
+	// 	return nil
+	// })
+	// if err != nil {
+	// 	return err
+	// }
 
-	repository = protobuf.Repository{
-		Path:       path,
-		Commits:    commits,
-		References: references,
-		Head:       &head,
-	}
+	// repository = protobuf.Repository{
+	// 	Path:       path,
+	// 	Commits:    commits,
+	// 	References: references,
+	// 	Head:       &head,
+	// }
     log.Printf("Log all commits took %s", time.Since(start))
 
 	return nil
@@ -158,17 +158,28 @@ func main() {
 	// CheckIfError(err)
 
 
-	start := time.Now()
-	packReader := packfile.NewPackReader(largePack)
+	// start := time.Now()
+	// packReader := packfile.NewPackReader(largePack)
 
-	object, err := packReader.ReadObject(plumbing.ToHash("f9a08e80a692542cb94be651a61f81dd7374b39f"))
+	// object, err := packReader.ReadObject(plumbing.ToHash("f9a08e80a692542cb94be651a61f81dd7374b39f"))
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// fmt.Println(object)
+	
+	
+
+	start := time.Now()
+	r, err := goe.OpenRepository("./repo")
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(object)
+	c, err := r.GetCommit(plumbing.ToHash("8c7d33981c2356cd4b07b666b36aef8fa17eaaae"))
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(c)
 	log.Printf("Operation took %s", time.Since(start))
-	
-	
 	
 	// testRepository()
 }

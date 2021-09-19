@@ -209,14 +209,11 @@ func (pr *PackReader) DeltaPatch(deltaReader *bytes.Buffer, baseReader *bytes.Re
 
 			baseReader.Seek(int64(offset), io.SeekStart)
 			io.CopyN(dest, baseReader, int64(size))
-			fmt.Println("copy from base", offset, size)
 		} else if (cmdByte & 0x80) == 0 && cmdByte != 0 { // copy from data after command byte
-			fmt.Println("copy from command")
 			size := uint(cmdByte)
 			// Read out the size of the data to be inserted, the data is followed
 			io.CopyN(dest, deltaReader, int64(size))
 		} else { // end of delta
-			fmt.Println("end")
 			break;
 		}
 	}
