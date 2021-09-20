@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/liy/goe/errors"
 	"github.com/liy/goe/object"
 	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/plumbing/packfile"
@@ -40,16 +41,61 @@ func (repo *Repository) GetCommits() []object.Commit {
 	return nil
 }
 
+// func (r *Repository) readFromFile(path string) object.Object {
+
+// }
+
 func (r *Repository) GetCommit(hash plumbing.Hash) (c *object.Commit, err error) {
-	for _, pr := range r.packReaders {
-		raw, err := pr.ReadObject(hash)
-		if err != nil {
-			// TODO: find it in the file system
-			return nil, err
-		} else {
-			return object.DecodeCommit(raw)
-		}
+	obj, err := object.ParseObjectFile(hash, r.path)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, fmt.Errorf("cannot find commit %s", hash)
+	if obj.Type != "commit" {
+		return nil, fmt.Errorf("object is not a commit")
+	}
+
+	c = &object.Commit{
+		Hash: hash,
+	}
+	err = c.Decode(obj.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
+
+
+func (r *Repository) GetTag(hash plumbing.Hash) (*object.Tag, error) {
+	for _, pr := range r.packReaders {
+		raw, err := pr.ReadObject(hash)
+		if err == errors.ErrObjectNotFound {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+
+		return object.DecodeTag(raw)
+	}
+
+	obj, err := object.ParseObjectFile(hash, r.path)
+	if err != nil {
+		return nil, err
+	}
+
+	if obj.Type != "tag" {
+		return nil, fmt.Errorf("object is not a tag")
+	}
+
+	t := &object.Tag{
+		Hash: hash,
+	}
+	err = t.Decode(obj.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	return t, nil
+}
+

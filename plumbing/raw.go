@@ -18,18 +18,33 @@ const (
 	OBJ_REF_DELTA ObjectType = 7
 )
 
+func ToObjectType(s string) ObjectType {
+	switch s {
+	case "commit":
+		return OBJ_COMMIT
+	case "tree":
+		return OBJ_TREE
+	case "blob":
+		return OBJ_BLOB
+	case "tag":
+		return OBJ_TAG
+	default:
+		return OBJ_INVALID
+	}
+}
+
 func (t ObjectType) String() string {
 	switch t {
 	case OBJ_INVALID:
 		return "OBJ_INVALID"
 	case OBJ_COMMIT:
-		return "OBJ_COMMIT"
+		return "commit"
 	case OBJ_TREE:
-		return "OBJ_TREE"
+		return "tree"
 	case OBJ_BLOB:
-		return "OBJ_BLOB"
+		return "blob"
 	case OBJ_TAG:
-		return "OBJ_TAG"
+		return "tag"
 	// 5 is reserved for future expansion
 	case OBJ_OFS_DELTA:
 		return "OBJ_OFS_DELTA"

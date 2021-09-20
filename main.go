@@ -170,15 +170,15 @@ func main() {
 	
 
 	start := time.Now()
-	r, err := goe.OpenRepository("./repo")
+	r, err := goe.OpenRepository("./repo-test")
 	if err != nil {
 		fmt.Println(err)
 	}
-	c, err := r.GetCommit(plumbing.ToHash("8c7d33981c2356cd4b07b666b36aef8fa17eaaae"))
+	o, err := r.GetTag(plumbing.ToHash("6dc409404e870d70c38a5ce9554c359a4ff339ee"))
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(c)
+	fmt.Println(o)
 	log.Printf("Operation took %s", time.Since(start))
 	
 	// testRepository()

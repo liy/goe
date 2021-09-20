@@ -1,52 +1,12 @@
 package object
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
-	"io"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/liy/goe/plumbing"
 )
 
-type Signature struct {
-	Name string
-	Email string
-	TimeStamp time.Time
-}
-
-func (s *Signature) Decode(data []byte) {
-	start := bytes.LastIndexByte(data, '<')
-	end := bytes.LastIndexByte(data, '>')
-
-	s.Name = string(data[:start-1])
-	s.Email = string(data[start+1:end])
-
-	// parse date time
-	chunks := bytes.Split(data[end+2:], []byte{' '})
-	ts, err := strconv.ParseInt(string(chunks[0]), 10, 64)
-	if err != nil {
-		return
-	}
-
-	// Timezone not used?
-	// tz, err := strconv.Atoi(string(chunks[1]))
-	// if err != nil {
-	// 	return
-	// }
-
-	s.TimeStamp = time.Unix(ts, 0)
-}
-
-func (s Signature) String() string {
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "%s <%s> %s", s.Name, s.Email, s.TimeStamp)
-
-	return sb.String()
-}
 
 type Commit struct {
 	Hash plumbing.Hash
@@ -57,53 +17,21 @@ type Commit struct {
 	Message string
 }
 
-func (c *Commit) Decode(raw *plumbing.RawObject) (err error) {
-	if raw.Type != plumbing.OBJ_COMMIT {
-		return fmt.Errorf("not commit object")
-	}
-
-	r := bytes.NewReader(raw.Data)
-	reader := bufferPool.Get().(*bufio.Reader)
-	defer bufferPool.Put(r)
-	reader.Reset(r)
-
-	for {
-		line, err := reader.ReadBytes('\n')
-		if err == io.EOF {
-			break
-		}
-
-		// message starts from the first empty line
-		line = bytes.TrimRight(line, "\n")
-		if len(line) == 0 {
-			break
-		}
-
-		chunks := bytes.SplitN(line, []byte{' '}, 2)
-		switch string(chunks[0]) {
+func (c *Commit) Decode(data []byte) error {
+	return ScanObjectData(data, func(key string, value []byte) {
+		switch key {
 		case "tree":
-			c.Tree = plumbing.ToHash(string(chunks[1]))
+			c.Tree = plumbing.ToHash(string(value))
 		case "parent":
-			c.Parents = append(c.Parents, plumbing.ToHash(string(chunks[1])))
+			c.Parents = append(c.Parents, plumbing.ToHash(string(value)))
 		case "author":
-			c.Author.Decode(chunks[1])
+			c.Author.Decode(value)
 		case "committer":
-			c.Commiter.Decode(chunks[1])
+			c.Commiter.Decode(value)
+		case "message":
+			c.Message = string(value)
 		}
-	}
-
-	var msg bytes.Buffer
-	for {
-		line, err := reader.ReadBytes('\n')
-		msg.Write(line)
-
-		if err == io.EOF {
-			break
-		}
-	}
-	c.Message = msg.String()
-
-	return nil
+	})
 }
 
 func (c Commit) String() string {
@@ -121,9 +49,13 @@ func (c Commit) String() string {
 }
 
 func DecodeCommit(raw *plumbing.RawObject) (*Commit, error) {
+	if raw.Type != plumbing.OBJ_COMMIT {
+		return nil, fmt.Errorf("object is not a commit")
+	}
+
 	c := &Commit{
 		Hash: raw.Hash(),
 	}
-	err := c.Decode(raw)
+	err := c.Decode(raw.Data)
 	return c, err
 }

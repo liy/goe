@@ -6,10 +6,12 @@ import (
 	"io"
 	"os"
 
+	"github.com/liy/goe/errors"
 	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/plumbing/indexfile"
 	"github.com/liy/goe/utils"
 )
+
 
 type Pack struct {
 	Name       plumbing.Hash
@@ -151,7 +153,7 @@ func (pr *PackReader) ReadObject(hash plumbing.Hash) (*plumbing.RawObject, error
 
 	offset, ok := pr.Index.GetOffset(hash)
 	if !ok  {
-		return nil, fmt.Errorf("cannot find %s raw object in pack: %s",  hash.Short(), pr.path)
+		return nil, errors.ErrObjectNotFound
 	}
 
 	raw := plumbing.NewRawObject(hash)
