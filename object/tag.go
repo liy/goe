@@ -51,10 +51,6 @@ func (t Tag) String() string {
 }
 
 func DecodeTag(raw *plumbing.RawObject) (*Tag, error) {
-	if raw.Type != plumbing.OBJ_TAG {
-		return nil, fmt.Errorf("object is not a tag")
-	}
-
 	t := &Tag{
 		Hash: raw.Hash(),
 	}

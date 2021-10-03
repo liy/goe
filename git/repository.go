@@ -46,8 +46,19 @@ func (repo *Repository) GetCommits() []object.Commit {
 // }
 
 func (r *Repository) GetCommit(hash plumbing.Hash) (c *object.Commit, err error) {
+	for _, pr := range r.packReaders {
+		raw, err := pr.ReadObject(hash)
+		if err == errors.ErrObjectNotFound {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+
+		return object.DecodeCommit(raw)
+	}
+
 	obj, err := object.ParseObjectFile(hash, r.path)
-	if err != nil {
+	if err != nil && err != errors.ErrObjectNotFound {
 		return nil, err
 	}
 

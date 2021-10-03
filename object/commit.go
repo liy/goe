@@ -34,6 +34,10 @@ func (c *Commit) Decode(data []byte) error {
 	})
 }
 
+func (c *Commit) GetCompareValue() int {
+	return int(c.Author.TimeStamp.Unix())
+}
+
 func (c Commit) String() string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "tree %v\n", c.Tree)
@@ -49,10 +53,6 @@ func (c Commit) String() string {
 }
 
 func DecodeCommit(raw *plumbing.RawObject) (*Commit, error) {
-	if raw.Type != plumbing.OBJ_COMMIT {
-		return nil, fmt.Errorf("object is not a commit")
-	}
-
 	c := &Commit{
 		Hash: raw.Hash(),
 	}

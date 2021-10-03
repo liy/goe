@@ -36,7 +36,7 @@ func NewPackReader(packPath string) *PackReader {
 		Index: indexfile.NewIndex(packPath[:len(packPath)-4] + "idx"),
 		file: file,
 		path: packPath,
-		cache: utils.NewLRU(int64(1 * 1024 * 1024)),
+		cache: utils.NewLRU(int64(5 * 1024 * 1024)),
 		s: make([]byte, 1),
 	}
 }
@@ -94,7 +94,7 @@ func (pr *PackReader) ReadObjectAt(offset int64, raw *plumbing.RawObject) error 
 
 		baseReader := bytes.NewReader(rawBase.Data)
 
-		err = pr.DeltaPatch(buffer, baseReader, raw)
+		err = pr.deltaPatch(buffer, baseReader, raw)
 		if err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func (pr *PackReader) ReadObjectAt(offset int64, raw *plumbing.RawObject) error 
 		raw.DeflatedSize = ReadVariableLengthLE(buffer)
 
 		baseReader := bytes.NewReader(rawBase.Data)
-		err := pr.DeltaPatch(buffer, baseReader, raw)
+		err := pr.deltaPatch(buffer, baseReader, raw)
 		if err != nil {
 			return err
 		}
@@ -166,7 +166,7 @@ func (pr *PackReader) ReadObject(hash plumbing.Hash) (*plumbing.RawObject, error
 	return raw, nil
 }
 
-func (pr *PackReader) DeltaPatch(deltaReader *bytes.Buffer, baseReader *bytes.Reader, dest io.Writer) error {	
+func (pr *PackReader) deltaPatch(deltaReader *bytes.Buffer, baseReader *bytes.Reader, dest io.Writer) error {	
 	// Reconstruct the object data from base object
 	for {
 		cmdByte, _ := deltaReader.ReadByte()

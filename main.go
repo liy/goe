@@ -3,12 +3,17 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
-	goplumbing "github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	goe "github.com/liy/goe/git"
-	"github.com/liy/goe/plumbing"
+	goeObject "github.com/liy/goe/object"
+	goePlumbing "github.com/liy/goe/plumbing"
+	"github.com/liy/goe/src/protobuf"
+	"github.com/liy/goe/utils"
+	ts "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const defaultPack = ".\\repo-test\\.git\\objects\\pack\\pack-66916c151da20048086dacbba45c420c0c1de8f6.pack"
@@ -43,72 +48,45 @@ func testRepository() error {
 	// }
 
 	// ... retrieves the commit history
-	// cIter, err := r.Log(&git.LogOptions{All: true})
-	// if err != nil {
-	// 	return err
-	// }
-
-	// var commits []*protobuf.Commit
-	// err = cIter.ForEach(func(c *object.Commit) error {
-	// 	messages := strings.Split(c.Message, "\n")
-
-	// 	summary := messages[0]
-	// 	body := ""
-	// 	if len(messages) > 1 {
-	// 		body = strings.Join(messages[1:], "\n")
-	// 	}
-
-	// 	parents := make([]string, c.NumParents())
-	// 	for i, pc := range c.ParentHashes {
-	// 		parents[i] = pc.String()
-	// 	}
-
-	// 	commit := protobuf.Commit{
-	// 		Hash:    c.Hash.String(),
-	// 		Summary: summary,
-	// 		Body:    body,
-	// 		Author: &protobuf.Contact{
-	// 			Name:  c.Author.Name,
-	// 			Email: c.Author.Email,
-	// 		},
-	// 		Committer: &protobuf.Contact{
-	// 			Name:  c.Committer.Name,
-	// 			Email: c.Committer.Email,
-	// 		},
-	// 		Parents:    parents,
-	// 		CommitTime: ts.New(c.Committer.When),
-	// 	}
-	// 	commits = append(commits, &commit)
-
-	// 	return nil
-	// })
-	c, err := r.CommitObject(goplumbing.NewHash("4f3b0254d9160fd8786d2edb3a6a73ffcf6b70ac"))
+	cIter, err := r.Log(&git.LogOptions{All: true, Order: git.LogOrderDefault})
 	if err != nil {
 		return err
 	}
-	fmt.Println(c)
-	// _, err = r.CommitObject(goplumbing.NewHash("8e0228daabdc4708fb3f333fb869de84d5ed7d01"))
-	// if err != nil {
-	// 	return err
-	// }
-	// _, err = r.CommitObject(goplumbing.NewHash("ff46c79f1154922d155dcd7b1d18027ab265b2fa"))
-	// if err != nil {
-	// 	return err
-	// }
-	// _, err = r.CommitObject(goplumbing.NewHash("7d9095383a9a222fa3ba82eb8a803bcb338ad946"))
-	// if err != nil {
-	// 	return err
-	// }
-	// _, err = r.CommitObject(goplumbing.NewHash("77ace532f338d733006de2a34783201ca9d2bcc8"))
-	// if err != nil {
-	// 	return err
-	// }
-	// _, err = r.CommitObject(goplumbing.NewHash("1d90bf4d8d24d47e5fb3ac07aabf5242c96a6c31"))
-	// if err != nil {
-	// 	return err
-	// }
 
-	// fmt.Println(commit)
+	var commits []*protobuf.Commit
+	err = cIter.ForEach(func(c *object.Commit) error {
+		messages := strings.Split(c.Message, "\n")
+
+		summary := messages[0]
+		body := ""
+		if len(messages) > 1 {
+			body = strings.Join(messages[1:], "\n")
+		}
+
+		parents := make([]string, c.NumParents())
+		for i, pc := range c.ParentHashes {
+			parents[i] = pc.String()
+		}
+
+		commit := protobuf.Commit{
+			Hash:    c.Hash.String(),
+			Summary: summary,
+			Body:    body,
+			Author: &protobuf.Contact{
+				Name:  c.Author.Name,
+				Email: c.Author.Email,
+			},
+			Committer: &protobuf.Contact{
+				Name:  c.Committer.Name,
+				Email: c.Committer.Email,
+			},
+			Parents:    parents,
+			CommitTime: ts.New(c.Committer.When),
+		}
+		commits = append(commits, &commit)
+
+		return nil
+	})
 
 	// var references []*protobuf.Reference
 	// rIter, err := r.References()
@@ -116,7 +94,7 @@ func testRepository() error {
 	// 	return err
 	// }
 
-	// err = rIter.ForEach(func(r *goplumbing.Reference) error {
+	// err = rIter.ForEach(func(r *plumbing.Reference) error {
 	// 	ref := protobuf.Reference{
 	// 		Name:      r.Name().String(),
 	// 		Shorthand: r.Name().Short(),
@@ -138,13 +116,63 @@ func testRepository() error {
 	// 	References: references,
 	// 	Head:       &head,
 	// }
-    log.Printf("Log all commits took %s", time.Since(start))
+	fmt.Println(len(commits))
+	log.Printf("Log all commits took %s", time.Since(start))
 
 	return nil
 }
 
+func mine() {
+	start := time.Now()
+
+	visited := make(map[goePlumbing.Hash]bool)
+	var queue utils.PrioQueue
+
+	r, err := goe.OpenRepository("./repo")
+	if err != nil {
+		fmt.Println(err)
+	}
+	nextCommit, err := r.GetCommit(goePlumbing.ToHash("29970a12c888ed57ae7b723551238375c70eac08"))
+	if err != nil {
+		fmt.Println(err)
+	}
+	queue.Enqueue(nextCommit)
+
+	commits := make([]*goeObject.Commit, 0)
+	for {
+		// queue.ForEach(func(item *utils.Comparable, idx int) {
+		// 	qc := (*item).(*goeObject.Commit)
+		// 	fmt.Println(qc.Hash)
+		// })
+		// fmt.Println("")
+
+		nextCommit, _ = (*queue.Dequeue()).(*goeObject.Commit)
+		// fmt.Println(nextCommit)
+		// fmt.Println("===")
+		commits = append(commits, nextCommit)
+
+		for _, ph := range nextCommit.Parents {
+			if _, exist := visited[ph]; !exist {
+				visited[ph] = true
+				c, err := r.GetCommit(ph)
+				if err != nil {
+					return
+				}
+
+				// fmt.Println("enqueue", c.Hash)
+				queue.Enqueue(c)
+			}
+		}
+
+		if queue.Size() == 0 {
+			break
+		}
+	}
+	fmt.Println(len(commits))
+	log.Printf("Operation took %s", time.Since(start))
+}
+
 func main() {
-	// testRepository()
 
 	// const port = ":8888"
 	// listener, err := net.Listen("tcp", port)
@@ -157,29 +185,6 @@ func main() {
 	// s.Serve(listener)
 	// CheckIfError(err)
 
-
-	// start := time.Now()
-	// packReader := packfile.NewPackReader(largePack)
-
-	// object, err := packReader.ReadObject(plumbing.ToHash("f9a08e80a692542cb94be651a61f81dd7374b39f"))
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// fmt.Println(object)
-	
-	
-
-	start := time.Now()
-	r, err := goe.OpenRepository("./repo-test")
-	if err != nil {
-		fmt.Println(err)
-	}
-	o, err := r.GetTag(plumbing.ToHash("6dc409404e870d70c38a5ce9554c359a4ff339ee"))
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(o)
-	log.Printf("Operation took %s", time.Since(start))
-	
 	// testRepository()
+	mine()
 }
