@@ -217,6 +217,6 @@ func main() {
 
 	// defer profile.Start().Stop()
 	// testRepository()
-	// main()
-	processed()
+	mine()
+	// processed()
 }

@@ -29,8 +29,6 @@ type PackReader struct {
 	path string
 	cache utils.Cache
 	offset int64
-	// one byte
-	s []byte
 }
 
 func NewPackReader(packPath string) *PackReader {
@@ -41,31 +39,34 @@ func NewPackReader(packPath string) *PackReader {
 		readBuf: bufio.NewReader(file),
 		path: packPath,
 		cache: utils.NewLRU(int64(5 * 1024 * 1024)),
-		s: make([]byte, 1),
 	}
 }
 
 func (pr *PackReader) ReadByte() (byte, error) {
-	_, err := pr.readBuf.Read(pr.s)
-	pr.offset++
-	return pr.s[0], err
+	b, err := pr.readBuf.ReadByte()
+	if err == nil {
+		pr.offset++
+	}
+	return b, err
 }
 
 func (pr *PackReader) Read(b []byte) (int, error) {
-	n, _ := pr.readBuf.Read(b)
-	pr.offset += int64(n)
-	return n, nil
+	n, err := pr.readBuf.Read(b)
+	if err == nil {
+		pr.offset += int64(n)
+	}
+	return n, err
 }
 
 func (pr *PackReader) Seek(offset int64, whence int) (int64, error) {
-	var err error
-
 	if whence == io.SeekCurrent && offset == 0 {
 		return pr.offset, nil
 	}
-
+	
+	var err error
 	pr.offset, err = pr.file.Seek(offset, whence)
 	pr.readBuf.Reset(pr.file)
+
 	return pr.offset, err
 }
 
