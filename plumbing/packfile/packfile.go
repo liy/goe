@@ -1,6 +1,7 @@
 package packfile
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -24,8 +25,10 @@ type Pack struct {
 type PackReader struct {
 	*indexfile.Index
 	file io.ReadSeeker
+	readBuf *bufio.Reader
 	path string
 	cache utils.Cache
+	offset int64
 	// one byte
 	s []byte
 }
@@ -35,6 +38,7 @@ func NewPackReader(packPath string) *PackReader {
 	return &PackReader{
 		Index: indexfile.NewIndex(packPath[:len(packPath)-4] + "idx"),
 		file: file,
+		readBuf: bufio.NewReader(file),
 		path: packPath,
 		cache: utils.NewLRU(int64(5 * 1024 * 1024)),
 		s: make([]byte, 1),
@@ -42,16 +46,27 @@ func NewPackReader(packPath string) *PackReader {
 }
 
 func (pr *PackReader) ReadByte() (byte, error) {
-	_, err := pr.file.Read(pr.s)
+	_, err := pr.readBuf.Read(pr.s)
+	pr.offset++
 	return pr.s[0], err
 }
 
 func (pr *PackReader) Read(b []byte) (int, error) {
-	return pr.file.Read(b)
+	n, _ := pr.readBuf.Read(b)
+	pr.offset += int64(n)
+	return n, nil
 }
 
 func (pr *PackReader) Seek(offset int64, whence int) (int64, error) {
-	return pr.file.Seek(offset, whence)
+	var err error
+
+	if whence == io.SeekCurrent && offset == 0 {
+		return pr.offset, nil
+	}
+
+	pr.offset, err = pr.file.Seek(offset, whence)
+	pr.readBuf.Reset(pr.file)
+	return pr.offset, err
 }
 
 func (pr *PackReader) ReadObjectAt(offset int64, raw *plumbing.RawObject) error {

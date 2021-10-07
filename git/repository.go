@@ -36,14 +36,20 @@ func OpenRepository(path string) (repo *Repository, err error) {
 	}, nil
 }
 
+func (r *Repository) ReadObject(hash plumbing.Hash) (raw *plumbing.RawObject, err error) {
+	for _, pr := range r.packReaders {
+		raw, err = pr.ReadObject(hash)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return raw, nil
+}
+
 // TODO: add sorting
 func (repo *Repository) GetCommits() []object.Commit {
 	return nil
 }
-
-// func (r *Repository) readFromFile(path string) object.Object {
-
-// }
 
 func (r *Repository) GetCommit(hash plumbing.Hash) (c *object.Commit, err error) {
 	for _, pr := range r.packReaders {

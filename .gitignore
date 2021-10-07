@@ -1,6 +1,7 @@
 repo
 repo-test
 repo-scratch
+commits_dump.go
 
 src/protobuf
 # certificates

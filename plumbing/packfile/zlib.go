@@ -32,6 +32,7 @@ func decompressObjectData(dst io.Writer, reader io.Reader) (int64, error) {
 	buffer := zlibBufferPool.Get().(*[]byte)
 	written, err := io.CopyBuffer(dst, zReader, *buffer)
 	zlibBufferPool.Put(buffer)
+	// written, err := io.Copy(dst, zReader)
 
 	return written, err
 }

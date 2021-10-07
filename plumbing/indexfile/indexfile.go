@@ -1,9 +1,10 @@
 package indexfile
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
-	"io/ioutil"
+	"os"
 
 	"github.com/liy/goe/plumbing"
 )
@@ -24,8 +25,9 @@ type Index struct {
 }
 
 func NewIndex(path string) *Index{
-	bytes, _ := ioutil.ReadFile(path)
-	idx, _ := Decode(bytes)
+	// bytes, _ := ioutil.ReadFile(path)
+	file, _ := os.Open(path)
+	idx, _ := Decode(bufio.NewReader(file))
 	return idx
 }
  

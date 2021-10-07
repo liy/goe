@@ -14,6 +14,10 @@ import (
 	"github.com/liy/goe/src/protobuf"
 	"github.com/liy/goe/utils"
 	ts "google.golang.org/protobuf/types/known/timestamppb"
+
+	_ "net/http/pprof"
+
+	_ "github.com/pkg/profile"
 )
 
 const defaultPack = ".\\repo-test\\.git\\objects\\pack\\pack-66916c151da20048086dacbba45c420c0c1de8f6.pack"
@@ -138,14 +142,9 @@ func mine() {
 	}
 	queue.Enqueue(nextCommit)
 
+	// count := 0
 	commits := make([]*goeObject.Commit, 0)
 	for {
-		// queue.ForEach(func(item *utils.Comparable, idx int) {
-		// 	qc := (*item).(*goeObject.Commit)
-		// 	fmt.Println(qc.Hash)
-		// })
-		// fmt.Println("")
-
 		nextCommit, _ = (*queue.Dequeue()).(*goeObject.Commit)
 		// fmt.Println(nextCommit)
 		// fmt.Println("===")
@@ -170,9 +169,40 @@ func mine() {
 	}
 	fmt.Println(len(commits))
 	log.Printf("Operation took %s", time.Since(start))
+
+	// f, _ := os.Create("./commits.go")
+	// defer f.Close()
+	// w := bufio.NewWriter(f)
+	// w.WriteString("package main\n")
+	// w.WriteString("var CommitHashes = [15639]string {")
+	// for _, c := range commits {
+	// 	w.WriteString("\""+c.Hash.String()+"\"" + ",\n")
+	// }
+	// w.WriteString("}")
+	// w.Flush()
+}
+
+func processed() {
+	start := time.Now()
+	r, err := goe.OpenRepository("./repo")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	objects := make([]*goeObject.Commit, 0)
+	for _, h := range CommitHashes {
+		o, _:= r.GetCommit(goePlumbing.ToHash(h))
+		// o, _ := r.ReadObject(goePlumbing.ToHash(h))
+		objects = append(objects, o)
+	}
+	fmt.Println(len(objects))
+	log.Printf("Operation took %s", time.Since(start))
 }
 
 func main() {
+	// go func() {
+	// 	log.Println(http.ListenAndServe("localhost:3000", nil))
+	// }()
 
 	// const port = ":8888"
 	// listener, err := net.Listen("tcp", port)
@@ -185,6 +215,8 @@ func main() {
 	// s.Serve(listener)
 	// CheckIfError(err)
 
+	// defer profile.Start().Stop()
 	// testRepository()
-	mine()
+	// main()
+	processed()
 }
