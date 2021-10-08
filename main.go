@@ -12,7 +12,6 @@ import (
 	goeObject "github.com/liy/goe/object"
 	goePlumbing "github.com/liy/goe/plumbing"
 	"github.com/liy/goe/src/protobuf"
-	"github.com/liy/goe/utils"
 	ts "google.golang.org/protobuf/types/known/timestamppb"
 
 	_ "net/http/pprof"
@@ -129,44 +128,62 @@ func testRepository() error {
 func mine() {
 	start := time.Now()
 
-	visited := make(map[goePlumbing.Hash]bool)
-	var queue utils.PrioQueue
-
 	r, err := goe.OpenRepository("./repo")
 	if err != nil {
 		fmt.Println(err)
 	}
-	nextCommit, err := r.GetCommit(goePlumbing.ToHash("29970a12c888ed57ae7b723551238375c70eac08"))
-	if err != nil {
-		fmt.Println(err)
-	}
-	queue.Enqueue(nextCommit)
+	// nextCommit, err := r.GetCommit(goePlumbing.ToHash("29970a12c888ed57ae7b723551238375c70eac08"))
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// queue.Enqueue(nextCommit)
 
-	// count := 0
-	commits := make([]*goeObject.Commit, 0)
-	for {
-		nextCommit, _ = (*queue.Dequeue()).(*goeObject.Commit)
-		// fmt.Println(nextCommit)
-		// fmt.Println("===")
-		commits = append(commits, nextCommit)
+	// // count := 0
+	// commits := make([]*goeObject.Commit, 0)
+	// for {
+	// 	nextCommit, _ = (*queue.Dequeue()).(*goeObject.Commit)
+	// 	// fmt.Println(nextCommit)
+	// 	// fmt.Println("===")
+	// 	commits = append(commits, nextCommit)
 
-		for _, ph := range nextCommit.Parents {
-			if _, exist := visited[ph]; !exist {
-				visited[ph] = true
-				c, err := r.GetCommit(ph)
-				if err != nil {
-					return
-				}
+	// 	for _, ph := range nextCommit.Parents {
+	// 		if _, exist := visited[ph]; !exist {
+	// 			visited[ph] = true
+	// 			c, err := r.GetCommit(ph)
+	// 			if err != nil {
+	// 				return
+	// 			}
 
-				// fmt.Println("enqueue", c.Hash)
-				queue.Enqueue(c)
-			}
-		}
+	// 			// fmt.Println("enqueue", c.Hash)
+	// 			queue.Enqueue(c)
+	// 		}
+	// 	}
 
-		if queue.Size() == 0 {
-			break
-		}
-	}
+	// 	if queue.Size() == 0 {
+	// 		break
+	// 	}
+	// }
+
+	// tip, _ := r.GetCommit(goePlumbing.ToHash("29970a12c888ed57ae7b723551238375c70eac08"))
+	// cItr := goe.NewCommitIterator(r, tip)
+
+	// commits := make([]*goeObject.Commit, 0)
+	// for {
+	// 	nextCommit, err := cItr.Next()
+	// 	if err == goe.Done {
+	// 		break
+	// 	} 
+
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 	}
+
+	// 	commits = append(commits, nextCommit)
+	// }
+	// fmt.Println(len(commits))
+	// log.Printf("Operation took %s", time.Since(start))
+
+	commits, _:=r.GetCommits(goePlumbing.ToHash("29970a12c888ed57ae7b723551238375c70eac08"))
 	fmt.Println(len(commits))
 	log.Printf("Operation took %s", time.Since(start))
 

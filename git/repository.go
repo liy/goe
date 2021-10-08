@@ -1,13 +1,15 @@
 package goe
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
-	"github.com/liy/goe/errors"
+	goeErrors "github.com/liy/goe/errors"
 	"github.com/liy/goe/object"
 	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/plumbing/packfile"
+	"github.com/liy/goe/utils"
 )
 
 type Repository struct {
@@ -46,15 +48,10 @@ func (r *Repository) ReadObject(hash plumbing.Hash) (raw *plumbing.RawObject, er
 	return raw, nil
 }
 
-// TODO: add sorting
-func (repo *Repository) GetCommits() []object.Commit {
-	return nil
-}
-
 func (r *Repository) GetCommit(hash plumbing.Hash) (c *object.Commit, err error) {
 	for _, pr := range r.packReaders {
 		raw, err := pr.ReadObject(hash)
-		if err == errors.ErrObjectNotFound {
+		if err == goeErrors.ErrObjectNotFound {
 			continue
 		} else if err != nil {
 			return nil, err
@@ -64,7 +61,7 @@ func (r *Repository) GetCommit(hash plumbing.Hash) (c *object.Commit, err error)
 	}
 
 	obj, err := object.ParseObjectFile(hash, r.path)
-	if err != nil && err != errors.ErrObjectNotFound {
+	if err != nil && err != goeErrors.ErrObjectNotFound {
 		return nil, err
 	}
 
@@ -83,11 +80,48 @@ func (r *Repository) GetCommit(hash plumbing.Hash) (c *object.Commit, err error)
 	return c, nil
 }
 
+func (r *Repository) GetCommits(hash plumbing.Hash) ([]*object.Commit, error) {
+	start, err := r.GetCommit(hash)
+	if err != nil {
+		return nil, err
+	}
+	queue := utils.NewPrioQueue(start)
+
+	// count := 0
+	commits := make([]*object.Commit, 0)
+	visited :=  make(map[plumbing.Hash]bool)
+
+	for {
+		commit, ok := (*queue.Dequeue()).(*object.Commit)
+		if !ok {
+			return nil, errors.New("not a commit object")
+		}
+		commits = append(commits, commit)
+
+		for _, ph := range commit.Parents {
+			if _, exist := visited[ph]; !exist {
+				visited[ph] = true
+				p, err := r.GetCommit(ph)
+				if err != nil {
+					return nil, errors.New("cannot get parent commit: " + ph.String()) 
+				}
+
+				queue.Enqueue(p)
+			}
+		}
+
+		if queue.Size() == 0 {
+			break
+		}
+	}
+
+	return commits, nil
+}
 
 func (r *Repository) GetTag(hash plumbing.Hash) (*object.Tag, error) {
 	for _, pr := range r.packReaders {
 		raw, err := pr.ReadObject(hash)
-		if err == errors.ErrObjectNotFound {
+		if err == goeErrors.ErrObjectNotFound {
 			continue
 		} else if err != nil {
 			return nil, err

@@ -18,6 +18,18 @@ type PrioQueue struct {
 	queue []*PrioQueueItem
 }
 
+// NewPrioQueue initialize the queue with first item
+func NewPrioQueue(object Comparable) *PrioQueue {
+	return &PrioQueue{
+		queue: []*PrioQueueItem{
+			{
+				&object,
+				0,
+			},
+		},
+	}
+}
+
 func (q PrioQueue) String() string {
 	var sb strings.Builder
 	fmt.Fprint(&sb, "[")
