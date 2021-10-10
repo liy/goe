@@ -9,8 +9,6 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	goe "github.com/liy/goe/git"
-	goeObject "github.com/liy/goe/object"
-	goePlumbing "github.com/liy/goe/plumbing"
 	"github.com/liy/goe/src/protobuf"
 	ts "google.golang.org/protobuf/types/known/timestamppb"
 
@@ -132,88 +130,37 @@ func mine() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	// nextCommit, err := r.GetCommit(goePlumbing.ToHash("29970a12c888ed57ae7b723551238375c70eac08"))
+
+	// commits, _:=r.GetCommits(goePlumbing.ToHash("29970a12c888ed57ae7b723551238375c70eac08"))
+	// var references []*protobuf.Reference
+	// rIter, err := r.References()
 	// if err != nil {
-	// 	fmt.Println(err)
+	// 	return err
 	// }
-	// queue.Enqueue(nextCommit)
+	
 
-	// // count := 0
-	// commits := make([]*goeObject.Commit, 0)
-	// for {
-	// 	nextCommit, _ = (*queue.Dequeue()).(*goeObject.Commit)
-	// 	// fmt.Println(nextCommit)
-	// 	// fmt.Println("===")
-	// 	commits = append(commits, nextCommit)
-
-	// 	for _, ph := range nextCommit.Parents {
-	// 		if _, exist := visited[ph]; !exist {
-	// 			visited[ph] = true
-	// 			c, err := r.GetCommit(ph)
-	// 			if err != nil {
-	// 				return
-	// 			}
-
-	// 			// fmt.Println("enqueue", c.Hash)
-	// 			queue.Enqueue(c)
-	// 		}
+	// err = rIter.ForEach(func(r *plumbing.Reference) error {
+	// 	ref := protobuf.Reference{
+	// 		Name:      r.Name().String(),
+	// 		Shorthand: r.Name().Short(),
+	// 		Hash:      r.Hash().String(),
+	// 		Type:      protobuf.Reference_Type(r.Type()),
+	// 		IsRemote:  r.Target().IsRemote(),
+	// 		IsBranch:  r.Target().IsBranch(),
 	// 	}
-
-	// 	if queue.Size() == 0 {
-	// 		break
-	// 	}
+	// 	references = append(references, &ref)
+	// 	return nil
+	// })
+	// if err != nil {
+	// 	return err
 	// }
 
-	// tip, _ := r.GetCommit(goePlumbing.ToHash("29970a12c888ed57ae7b723551238375c70eac08"))
-	// cItr := goe.NewCommitIterator(r, tip)
-
-	// commits := make([]*goeObject.Commit, 0)
-	// for {
-	// 	nextCommit, err := cItr.Next()
-	// 	if err == goe.Done {
-	// 		break
-	// 	} 
-
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 	}
-
-	// 	commits = append(commits, nextCommit)
-	// }
-	// fmt.Println(len(commits))
-	// log.Printf("Operation took %s", time.Since(start))
-
-	commits, _:=r.GetCommits(goePlumbing.ToHash("29970a12c888ed57ae7b723551238375c70eac08"))
-	fmt.Println(len(commits))
-	log.Printf("Operation took %s", time.Since(start))
-
-	// f, _ := os.Create("./commits.go")
-	// defer f.Close()
-	// w := bufio.NewWriter(f)
-	// w.WriteString("package main\n")
-	// w.WriteString("var CommitHashes = [15639]string {")
-	// for _, c := range commits {
-	// 	w.WriteString("\""+c.Hash.String()+"\"" + ",\n")
-	// }
-	// w.WriteString("}")
-	// w.Flush()
-}
-
-func processed() {
-	start := time.Now()
-	r, err := goe.OpenRepository("./repo")
+	refs, err := r.GetReferences()
 	if err != nil {
 		fmt.Println(err)
 	}
-
-	objects := make([]*goeObject.Commit, 0)
-	for _, h := range CommitHashes {
-		o, _:= r.GetCommit(goePlumbing.ToHash(h))
-		// o, _ := r.ReadObject(goePlumbing.ToHash(h))
-		objects = append(objects, o)
-	}
-	fmt.Println(len(objects))
-	log.Printf("Operation took %s", time.Since(start))
+	fmt.Println(refs)
+	log.Printf("Log all commits took %s", time.Since(start))
 }
 
 func main() {
@@ -223,17 +170,22 @@ func main() {
 
 	// const port = ":8888"
 	// listener, err := net.Listen("tcp", port)
-	// CheckIfError(err)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
 	// credentials, err := credentials.NewServerTLSFromFile("./certificates/server.pem", "./certificates/server.key")
-	// CheckIfError(err)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+
 	// opts := []grpc.ServerOption{grpc.Creds(credentials), grpc.MaxRecvMsgSize(20 * 1024 * 1024), grpc.MaxSendMsgSize(20 * 1024 * 1024)}
 	// s := grpc.NewServer(opts...)
 	// protobuf.RegisterRepositoryServiceServer(s, new(RepositoryService))
 	// s.Serve(listener)
-	// CheckIfError(err)
 
-	// defer profile.Start().Stop()
+
 	// testRepository()
 	mine()
 	// processed()
+	// defer profile.Start().Stop()
 }

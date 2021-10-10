@@ -34,7 +34,6 @@ var bufferPool = sync.Pool{
 }
 
 func ParseObjectFile(hash plumbing.Hash, repoPath string) (*Object, error) {
-	// TODO: Try find it in the files system
 	h := hash.String()
 	p := filepath.Join(repoPath, "objects", h[:2], h[2:])
 	_, err := os.Stat(p)
