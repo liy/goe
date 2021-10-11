@@ -122,7 +122,7 @@ func (r *Repository) GetCommits(hash plumbing.Hash) ([]*object.Commit, error) {
 	return commits, nil
 }
 
-func (r *Repository) GetTag(hash plumbing.Hash) (*object.Tag, error) {
+func (r *Repository) GetAnnotatedTag(hash plumbing.Hash) (*object.Tag, error) {
 	for _, pr := range r.packReaders {
 		raw, err := pr.ReadObject(hash)
 		if err == goeErrors.ErrObjectNotFound {
@@ -156,6 +156,19 @@ func (r *Repository) GetTag(hash plumbing.Hash) (*object.Tag, error) {
 
 func (r *Repository) GetPath() string {
 	return r.path
+}
+
+func (r *Repository) GetBranch(name string) (plumbing.Hash, error) {
+	return r.GetReference("refs/heads/" + name)
+}
+
+
+func (r *Repository) GetRemoteBranch(branchName string, remoteName string) (plumbing.Hash, error) {
+	return r.GetReference("refs/remotes/" + remoteName + "/heads" + branchName)
+}
+
+func (r *Repository) GetRemoteTag(tagName string, remoteName string) (plumbing.Hash, error) {
+	return r.GetReference("refs/remotes/" + remoteName + "/tags" + tagName)
 }
 
 // TODO: cache references?
@@ -219,6 +232,7 @@ func (r *Repository) GetReferences() ([]plumbing.Reference, error) {
 		return references, nil
 	}
 	
+	// TODO: scan other remotes and tags folder 
 	// read individual ref files
 	folder, err := os.Open(filepath.Join(r.path + "heads"))
     if err != nil {
@@ -242,5 +256,30 @@ func (r *Repository) GetReferences() ([]plumbing.Reference, error) {
 
 		references = append(references, *plumbing.NewReference(refName, plumbing.ToHash(string(lineBytes))))
 	}
+
+	// individual tag file
+	folder, err = os.Open(filepath.Join(r.path + "tags"))
+    if err != nil {
+        return nil, err
+    }
+    infos, err = folder.Readdir(0)
+    if err != nil {
+        return nil, err
+    }
+
+    for _, f := range infos {
+		if f.IsDir() {
+			continue
+		}
+
+		refName := "refs/tags/" + f.Name()
+		lineBytes, err := os.ReadFile(filepath.Join(r.path, refName))
+		if err != nil {
+			continue
+		}
+
+		references = append(references, *plumbing.NewReference(refName, plumbing.ToHash(string(lineBytes))))
+	}
+
 	return references, nil
 }
