@@ -89,7 +89,8 @@ func (r *Repository) GetCommits(hash plumbing.Hash) ([]*object.Commit, error) {
 	if err != nil {
 		return nil, err
 	}
-	queue := utils.NewPrioQueue(start)
+	queue := utils.PrioQueue{}
+	queue.Enqueue(start)
 
 	// count := 0
 	commits := make([]*object.Commit, 0)
@@ -158,34 +159,34 @@ func (r *Repository) GetPath() string {
 	return r.path
 }
 
-func (r *Repository) GetBranch(name string) (plumbing.Hash, error) {
+func (r *Repository) GetBranch(name string) (*plumbing.Reference, error) {
 	return r.GetReference("refs/heads/" + name)
 }
 
 
-func (r *Repository) GetRemoteBranch(branchName string, remoteName string) (plumbing.Hash, error) {
+func (r *Repository) GetRemoteBranch(branchName string, remoteName string) (*plumbing.Reference, error) {
 	return r.GetReference("refs/remotes/" + remoteName + "/heads" + branchName)
 }
 
-func (r *Repository) GetRemoteTag(tagName string, remoteName string) (plumbing.Hash, error) {
+func (r *Repository) GetRemoteTag(tagName string, remoteName string) (*plumbing.Reference, error) {
 	return r.GetReference("refs/remotes/" + remoteName + "/tags" + tagName)
 }
 
 // TODO: cache references?
-func (r *Repository) findPackedReference(scanner *bufio.Scanner, name string) (plumbing.Hash, error) {
+func (r *Repository) findPackedReference(scanner *bufio.Scanner, name string) (*plumbing.Reference, error) {
 	for scanner.Scan() {
 		lineBytes := scanner.Bytes()
 		chunks := bytes.SplitN(lineBytes, []byte{' '}, 2)
 		
 		if name == string(chunks[1]) {
-			return plumbing.NewHash(chunks[0]), nil
+			return plumbing.NewReference(name, plumbing.NewHash(chunks[0])), nil
 		}
 	}
 
-	return plumbing.Hash{}, goeErrors.ErrReferenceNoteFound
+	return nil, goeErrors.ErrReferenceNoteFound
 }
 
-func (r *Repository) GetReference(name string) (plumbing.Hash, error) {
+func (r *Repository) GetReference(name string) (*plumbing.Reference, error) {
 	// Try packed-refs first
 	file, err := os.Open(filepath.Join(r.path, "packed-refs"))
 	if err == nil {
@@ -195,15 +196,15 @@ func (r *Repository) GetReference(name string) (plumbing.Hash, error) {
 	// then refs folder
 	lineBytes, err := ioutil.ReadFile(filepath.Join(r.path, name))
 	if err != nil {
-		return plumbing.Hash{}, goeErrors.ErrReferenceNoteFound
+		return nil, goeErrors.ErrReferenceNoteFound
 	}
-	return plumbing.NewHash(bytes.TrimSpace(lineBytes)), nil
+	return plumbing.NewReference(name, plumbing.NewHash(bytes.TrimSpace(lineBytes))), nil
 }
 
-func (r *Repository) Head() (plumbing.Hash, error) {
+func (r *Repository) GetHead() (*plumbing.Reference, error) {
 	file, err := os.Open(filepath.Join(r.path, "HEAD"))
 	if err != nil {
-		return plumbing.Hash{}, goeErrors.ErrReferenceNoteFound
+		return nil, goeErrors.ErrReferenceNoteFound
 	}
 	reader := bufio.NewReader(file)
 	line, _, _ := reader.ReadLine()

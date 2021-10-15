@@ -16,12 +16,18 @@ type CommitIterator struct {
 	r *Repository
 }
 
-func NewCommitIterator(r *Repository, start *object.Commit) *CommitIterator {
-	return &CommitIterator{
+func NewCommitIterator(r *Repository, tips []*object.Commit) *CommitIterator {
+	itr := &CommitIterator{
 		visited:  make(map[plumbing.Hash]bool),
-		queue: utils.NewPrioQueue(start),
+		queue: &utils.PrioQueue{},
 		r: r,
 	}
+
+	for _, c := range tips {
+		itr.queue.Enqueue(c)
+	}
+
+	return itr
 }
 
 func (ci *CommitIterator) Next() (*object.Commit, error) {

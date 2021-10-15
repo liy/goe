@@ -11,7 +11,7 @@ type Tag struct {
 	Hash plumbing.Hash
 	Target plumbing.Hash
 	TargetType plumbing.ObjectType
-	Tag string
+	Name string
 	Tagger Signature
 	Message string
 }
@@ -31,7 +31,7 @@ func (t *Tag) Decode(data []byte) error {
 		case "type":
 			t.TargetType = plumbing.ToObjectType(string(value))
 		case "tag":
-			t.Tag = string(value)
+			t.Name = string(value)
 		case "tagger":
 			t.Tagger.Decode(value)
 		}
@@ -42,7 +42,7 @@ func (t Tag) String() string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "object %v\n", t.Target)
 	fmt.Fprintf(&sb, "type %s\n", t.TargetType)
-	fmt.Fprintf(&sb, "tag %s\n", t.Tag)
+	fmt.Fprintf(&sb, "name %s\n", t.Name)
 	fmt.Fprintf(&sb, "tagger %s\n", t.Tagger)
 	fmt.Fprint(&sb, "\n")
 	fmt.Fprint(&sb, t.Message)

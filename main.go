@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	goe "github.com/liy/goe/git"
+	goeObject "github.com/liy/goe/object"
+	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/src/protobuf"
 	ts "google.golang.org/protobuf/types/known/timestamppb"
 
@@ -131,34 +134,90 @@ func mine() {
 		fmt.Println(err)
 	}
 
-	// commits, _:=r.GetCommits(goePlumbing.ToHash("29970a12c888ed57ae7b723551238375c70eac08"))
-	// var references []*protobuf.Reference
-	// rIter, err := r.References()
-	// if err != nil {
-	// 	return err
-	// }
-	
-
-	// err = rIter.ForEach(func(r *plumbing.Reference) error {
-	// 	ref := protobuf.Reference{
-	// 		Name:      r.Name().String(),
-	// 		Shorthand: r.Name().Short(),
-	// 		Hash:      r.Hash().String(),
-	// 		Type:      protobuf.Reference_Type(r.Type()),
-	// 		IsRemote:  r.Target().IsRemote(),
-	// 		IsBranch:  r.Target().IsBranch(),
-	// 	}
-	// 	references = append(references, &ref)
-	// 	return nil
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
 	refs, err := r.GetReferences()
+	if err != nil {
+		fmt.Println("warning: ", err)
+	}
+
+	// Setup potential tips
+	tips := make([]*goeObject.Commit, len(refs))
+	for i, ref := range refs {
+		c, err := r.GetCommit(ref.Hash)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		tips[i] = c
+	}
+
+	fmt.Println(hex.EncodeToString(tips[201].Hash[:]))
+
+	var commits []*protobuf.Commit
+	cItr := goe.NewCommitIterator(r, tips)
+	for  {
+		c, err := cItr.Next()
+		if err == goe.Done {
+			break
+		}
+		if err != nil {
+			break;
+		}
+
+		parents := make([]string, len(c.Parents))
+		for i, ph := range c.Parents {
+			parents[i] = ph.String()
+		}
+
+		chunks := strings.Split(c.Message, "\n")
+		commits = append(commits, &protobuf.Commit{
+			Hash:    c.Hash.String(),
+			Summary: chunks[0],
+			Body:    chunks[1],
+			Author: &protobuf.Contact{
+				Name:  c.Author.Name,
+				Email: c.Author.Email,
+			},
+			Committer: &protobuf.Contact{
+				Name:  c.Committer.Name,
+				Email: c.Committer.Email,
+			},
+			Parents:    parents,
+			CommitTime: ts.New(c.Committer.TimeStamp),
+		})
+	}
+
+	references := make([]*protobuf.Reference, len(refs))
+	for i, rf := range refs {
+		ref := protobuf.Reference{
+			Name:      rf.Name,
+			Shorthand: rf.Name,
+			Hash:      rf.Hash.String(),
+			IsRemote:  rf.IsRemote(),
+			IsBranch:  rf.IsBranch(),
+		}
+		references[i] = &ref
+	}
+
+	// ... retrieves the branch pointed by HEAD
+	headRef, err := r.GetHead()
+	head := protobuf.Head{
+		Hash:      headRef.Hash.String(),
+		Shorthand: headRef.Name,
+		Name:      headRef.Hash.Short(),
+	}
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	repository = protobuf.Repository{
+		Path:       r.GetPath(),
+		Commits:    commits,
+		References: references,
+		Head:       &head,
+	}
+		
+
 	fmt.Println(refs)
 	log.Printf("Log all commits took %s", time.Since(start))
 }
@@ -185,7 +244,16 @@ func main() {
 
 
 	// testRepository()
-	mine()
+	// mine()
 	// processed()
 	// defer profile.Start().Stop()
+
+	
+	r, err := goe.OpenRepository("./repo-test")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	raw, err := r.ReadObject(plumbing.ToHash("93e63b972b745f8766f5e529bc346e0d411ae36e"))
+	fmt.Println(raw.Type)
 }

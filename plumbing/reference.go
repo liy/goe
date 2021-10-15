@@ -1,35 +1,38 @@
 package plumbing
 
+import "strings"
+
 const (
 	branchPath = "refs/heads/"
 	tagPath    = "refs/tags/"
 	remotePath = "refs/remotes/"
+	notePath   = "refs/notes/"
 )
 
 type Reference struct {
 	Name string
-	Hash Hash
+	target Hash
 }
 
-func NewReference(name string, hash Hash) *Reference {
+func NewReference(name string, target Hash) *Reference {
 	return &Reference{
 		name,
-		hash,
+		target,
 	}
 }
 
-func ReadBranches(name string, repoPath string) {
+func (r *Reference) IsRemote() bool {
+	return strings.HasPrefix(r.Name, remotePath)
+}
+
+func (r *Reference) IsBranch() bool {
+	return strings.HasPrefix(r.Name, branchPath)
+}
+
+func (r *Reference) IsAnnotatedTag() bool {
 
 }
 
-func ReadTags(name string, repoPath string) {
-
-}
-
-func ReadRemoteBranches(name string, repoPath string) {
-
-}
-
-func ReadRemoteTags(name string, repoPath string) {
-
+func (r *Reference) Target() Hash {
+	return r.target
 }

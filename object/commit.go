@@ -13,7 +13,7 @@ type Commit struct {
 	Tree plumbing.Hash
 	Parents []plumbing.Hash
 	Author Signature
-	Commiter Signature
+	Committer Signature
 	Message string
 }
 
@@ -27,7 +27,7 @@ func (c *Commit) Decode(data []byte) error {
 		case "author":
 			c.Author.Decode(value)
 		case "committer":
-			c.Commiter.Decode(value)
+			c.Committer.Decode(value)
 		case "message":
 			c.Message = string(value)
 		}
@@ -45,7 +45,7 @@ func (c Commit) String() string {
 		fmt.Fprintf(&sb, "parent %v\n", p)
 	}
 	fmt.Fprintf(&sb, "author %s\n", c.Author)
-	fmt.Fprintf(&sb, "commiter %s\n", c.Commiter)
+	fmt.Fprintf(&sb, "committer %s\n", c.Committer)
 	fmt.Fprint(&sb, "\n")
 	fmt.Fprint(&sb, c.Message)
 
