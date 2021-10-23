@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-
-	"github.com/liy/goe/utils"
 )
 
 // func Decode(indexBytes []byte) (*Index, error) {
@@ -16,7 +14,9 @@ func Decode(reader io.Reader) (*Index, error) {
 	// Check magic header
 	magicBytes := make([]byte, 4)
 	_, err := io.ReadFull(reader, magicBytes)
-	utils.CheckIfError(err)
+	if err != nil {
+		return nil, err
+	}
 	if string(magicBytes) != "\377tOc" {
 		return nil, fmt.Errorf("invalid IDX header, only version 2 supported: %q", string(magicBytes))
 	}
@@ -56,16 +56,16 @@ func Decode(reader io.Reader) (*Index, error) {
 		return nil, err
 	}
 
-	// offsets 32 
+	// offsets 32
 	idx.Offset32 = make([]byte, idx.NumObjects*4)
 	_, err = io.ReadFull(reader, idx.Offset32)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Check if any offset64, msb is 1
 	var numOffset64 int
-	for i := 0; i < int(idx.NumObjects); i+=4 {
+	for i := 0; i < int(idx.NumObjects); i += 4 {
 		if idx.Offset32[i]&128 > 0 {
 			numOffset64++
 		}
@@ -86,6 +86,6 @@ func Decode(reader io.Reader) (*Index, error) {
 		offset := idx.getOffset(i)
 		idx.ReverseHash[uint64(offset)] = uint32(i)
 	}
-	
+
 	return idx, nil
 }

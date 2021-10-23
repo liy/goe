@@ -13,7 +13,6 @@ import (
 	"github.com/liy/goe/utils"
 )
 
-
 type Pack struct {
 	Name       plumbing.Hash
 	Version    int32
@@ -24,21 +23,21 @@ type Pack struct {
 
 type PackReader struct {
 	*indexfile.Index
-	file io.ReadSeeker
+	file      io.ReadSeeker
 	bufReader *bufio.Reader
-	path string
-	cache utils.Cache
-	offset int64
+	path      string
+	cache     utils.Cache
+	offset    int64
 }
 
 func NewPackReader(packPath string) *PackReader {
 	file, _ := os.Open(packPath)
 	return &PackReader{
-		Index: indexfile.NewIndex(packPath[:len(packPath)-4] + "idx"),
-		file: file,
+		Index:     indexfile.NewIndex(packPath[:len(packPath)-4] + "idx"),
+		file:      file,
 		bufReader: bufio.NewReader(file),
-		path: packPath,
-		cache: utils.NewLRU(int64(5 * 1024 * 1024)),
+		path:      packPath,
+		cache:     utils.NewLRU(int64(5 * 1024 * 1024)),
 	}
 }
 
@@ -62,7 +61,7 @@ func (pr *PackReader) Seek(offset int64, whence int) (int64, error) {
 	if whence == io.SeekCurrent && offset == 0 {
 		return pr.offset, nil
 	}
-	
+
 	var err error
 	pr.offset, err = pr.file.Seek(offset, whence)
 	pr.bufReader.Reset(pr.file)
@@ -75,7 +74,7 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 	dataByte, _ := pr.ReadByte()
 
 	// msb is a flag whether to continue read byte for size construction, 3 bits for raw type and 4 bits for size
-	raw.Type = plumbing.ObjectType((dataByte >> 4) & 7)
+	raw.RawType = plumbing.ObjectType((dataByte >> 4) & 7)
 
 	// TODO: have a threshold to prevent read large raw into the memory
 	raw.DeflatedSize = int64(dataByte & 0x0F)
@@ -85,11 +84,12 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 		raw.DeflatedSize += int64(dataByte&0x7F) << shift
 		shift += 7
 	}
-	raw.PackedSize = raw.DeflatedSize
+	// raw.PackedSize = raw.DeflatedSize
 
-	if raw.Type == plumbing.OBJ_REF_DELTA {
+	// base object is specified by hash
+	if raw.RawType == plumbing.OBJ_REF_DELTA {
 		hb := make([]byte, 20)
-		io.ReadFull(pr, hb)
+		pr.Read(hb)
 		baseHash := plumbing.NewHash(hb)
 
 		// Traverse to read base object
@@ -97,33 +97,34 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 		if err != nil {
 			return err
 		}
-		
+		// Raw object type is actually its base type
+		raw.Type = rawBase.Type
+
 		buffer := bytes.NewBuffer(make([]byte, 0))
 		decompressObjectData(buffer, pr)
 
 		// For error checking only
-		baseSize := ReadVariableLengthLE(buffer)
+		baseSize := utils.ReadVariableLengthLE(buffer)
 		if rawBase.DeflatedSize != baseSize {
 			return fmt.Errorf("wrong base object size")
 		}
-		raw.DeflatedSize = ReadVariableLengthLE(buffer)
+		raw.DeflatedSize = utils.ReadVariableLengthLE(buffer)
 
 		baseReader := bytes.NewReader(rawBase.Data)
-
 		err = pr.deltaPatch(buffer, baseReader, raw)
 		if err != nil {
 			return err
 		}
-	} else if raw.Type == plumbing.OBJ_OFS_DELTA {
-		// Read the negative offset to the base object 
-		baseOffset := offset - ReadVariableLength(pr)
+	} else if raw.RawType == plumbing.OBJ_OFS_DELTA { // base object is specified by offset
+		// Read the negative offset to the base object
+		baseOffset := offset - utils.ReadVariableLength(pr)
 
 		hb, ok := pr.GetHashFromOffset(uint64(baseOffset))
 		if !ok {
 			return nil
 		}
 		baseHash := plumbing.NewHash(hb)
-		
+
 		// Traverse to read base object
 		var rawBase *plumbing.RawObject
 		if item, ok := pr.cache.Get(baseHash); ok {
@@ -138,16 +139,18 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 			pr.cache.Add(rawBase)
 			pr.Seek(resume, io.SeekStart)
 		}
+		// Raw object type is actually its base type
+		raw.Type = rawBase.Type
 
 		buffer := bytes.NewBuffer(make([]byte, 0))
 		decompressObjectData(buffer, pr)
 
 		// For error checking only
-		baseSize := ReadVariableLengthLE(buffer)
+		baseSize := utils.ReadVariableLengthLE(buffer)
 		if rawBase.DeflatedSize != baseSize {
 			return fmt.Errorf("wrong base object size")
 		}
-		raw.DeflatedSize = ReadVariableLengthLE(buffer)
+		raw.DeflatedSize = utils.ReadVariableLengthLE(buffer)
 
 		baseReader := bytes.NewReader(rawBase.Data)
 		err := pr.deltaPatch(buffer, baseReader, raw)
@@ -155,6 +158,7 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 			return err
 		}
 	} else {
+		raw.Type = raw.RawType
 		decompressObjectData(raw, pr)
 	}
 
@@ -168,7 +172,7 @@ func (pr *PackReader) ReadObject(hash plumbing.Hash) (*plumbing.RawObject, error
 	}
 
 	offset, ok := pr.Index.GetOffset(hash)
-	if !ok  {
+	if !ok {
 		return nil, errors.ErrObjectNotFound
 	}
 
@@ -182,7 +186,7 @@ func (pr *PackReader) ReadObject(hash plumbing.Hash) (*plumbing.RawObject, error
 	return raw, nil
 }
 
-func (pr *PackReader) deltaPatch(deltaReader *bytes.Buffer, baseReader *bytes.Reader, dest io.Writer) error {	
+func (pr *PackReader) deltaPatch(deltaReader *bytes.Buffer, baseReader *bytes.Reader, dest io.Writer) error {
 	// Reconstruct the object data from base object
 	for {
 		cmdByte, _ := deltaReader.ReadByte()
@@ -192,7 +196,7 @@ func (pr *PackReader) deltaPatch(deltaReader *bytes.Buffer, baseReader *bytes.Re
 			var offset uint32
 			if (cmdByte & 0x01) != 0 {
 				b, _ := deltaReader.ReadByte()
-				offset = uint32(b) 
+				offset = uint32(b)
 			}
 			if (cmdByte & 0x02) != 0 {
 				b, _ := deltaReader.ReadByte()
@@ -211,15 +215,15 @@ func (pr *PackReader) deltaPatch(deltaReader *bytes.Buffer, baseReader *bytes.Re
 			var size uint32
 			if (cmdByte & 0x10) != 0 {
 				b, _ := deltaReader.ReadByte()
-				size = uint32(b) 
+				size = uint32(b)
 			}
 			if (cmdByte & 0x20) != 0 {
 				b, _ := deltaReader.ReadByte()
-				size = uint32(b) << 8 | size
+				size = uint32(b)<<8 | size
 			}
 			if (cmdByte & 0x40) != 0 {
 				b, _ := deltaReader.ReadByte()
-				size = uint32(b) << 16 | size
+				size = uint32(b)<<16 | size
 			}
 			if size == 0 {
 				size = 0x10000
@@ -227,12 +231,12 @@ func (pr *PackReader) deltaPatch(deltaReader *bytes.Buffer, baseReader *bytes.Re
 
 			baseReader.Seek(int64(offset), io.SeekStart)
 			io.CopyN(dest, baseReader, int64(size))
-		} else if (cmdByte & 0x80) == 0 && cmdByte != 0 { // copy from data after command byte
+		} else if (cmdByte&0x80) == 0 && cmdByte != 0 { // copy from data after command byte
 			size := uint(cmdByte)
 			// Read out the size of the data to be inserted, the data is followed
 			io.CopyN(dest, deltaReader, int64(size))
 		} else { // end of delta
-			break;
+			break
 		}
 	}
 

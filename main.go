@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 	"strings"
@@ -129,20 +128,39 @@ func testRepository() error {
 func mine() {
 	start := time.Now()
 
-	r, err := goe.OpenRepository("./repo")
+	r, err := goe.OpenRepository("./repos/rails")
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	refs, err := r.GetReferences()
-	if err != nil {
-		fmt.Println("warning: ", err)
-	}
+	refs := r.GetReferences()
 
 	// Setup potential tips
 	tips := make([]*goeObject.Commit, len(refs))
 	for i, ref := range refs {
-		c, err := r.GetCommit(ref.Hash)
+		var c *goeObject.Commit
+
+		hashStr := r.TryPeel(ref.Target).String()
+		raw, err := r.ReadObject(plumbing.ToHash(hashStr))
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		if raw.Type == plumbing.OBJ_TAG {
+			tag, err := goeObject.DecodeTag(raw)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			raw, err = r.ReadObject(tag.Target)
+			if err != nil {
+				continue
+			}
+		}
+
+		c, err = goeObject.DecodeCommit(raw)
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -151,17 +169,15 @@ func mine() {
 		tips[i] = c
 	}
 
-	fmt.Println(hex.EncodeToString(tips[201].Hash[:]))
-
 	var commits []*protobuf.Commit
 	cItr := goe.NewCommitIterator(r, tips)
-	for  {
+	for {
 		c, err := cItr.Next()
 		if err == goe.Done {
 			break
 		}
 		if err != nil {
-			break;
+			break
 		}
 
 		parents := make([]string, len(c.Parents))
@@ -170,10 +186,14 @@ func mine() {
 		}
 
 		chunks := strings.Split(c.Message, "\n")
+		body := ""
+		if len(chunks) == 2 {
+			body = chunks[1]
+		}
 		commits = append(commits, &protobuf.Commit{
 			Hash:    c.Hash.String(),
 			Summary: chunks[0],
-			Body:    chunks[1],
+			Body:    body,
 			Author: &protobuf.Contact{
 				Name:  c.Author.Name,
 				Email: c.Author.Email,
@@ -192,33 +212,28 @@ func mine() {
 		ref := protobuf.Reference{
 			Name:      rf.Name,
 			Shorthand: rf.Name,
-			Hash:      rf.Hash.String(),
-			IsRemote:  rf.IsRemote(),
-			IsBranch:  rf.IsBranch(),
+			Hash:      string(rf.Target),
+			IsRemote:  plumbing.IsRemote(rf.Name),
+			IsBranch:  plumbing.IsBranch(rf.Name),
 		}
 		references[i] = &ref
 	}
 
-	// ... retrieves the branch pointed by HEAD
-	headRef, err := r.GetHead()
+	headRef, _ := r.HEAD()
 	head := protobuf.Head{
-		Hash:      headRef.Hash.String(),
+		Hash:      r.TryPeel(headRef.Target).String(),
+		Name:      headRef.Name,
 		Shorthand: headRef.Name,
-		Name:      headRef.Hash.Short(),
-	}
-	if err != nil {
-		fmt.Println(err)
 	}
 
-	repository = protobuf.Repository{
+	_ = protobuf.Repository{
 		Path:       r.GetPath(),
 		Commits:    commits,
 		References: references,
 		Head:       &head,
 	}
-		
 
-	fmt.Println(refs)
+	fmt.Println(len(commits))
 	log.Printf("Log all commits took %s", time.Since(start))
 }
 
@@ -242,18 +257,18 @@ func main() {
 	// protobuf.RegisterRepositoryServiceServer(s, new(RepositoryService))
 	// s.Serve(listener)
 
-
 	// testRepository()
-	// mine()
+	mine()
 	// processed()
 	// defer profile.Start().Stop()
 
-	
-	r, err := goe.OpenRepository("./repo-test")
-	if err != nil {
-		fmt.Println(err)
-	}
+	// r, err := goe.OpenRepository("./repo")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
 
-	raw, err := r.ReadObject(plumbing.ToHash("93e63b972b745f8766f5e529bc346e0d411ae36e"))
-	fmt.Println(raw.Type)
+	// raw, err := r.ReadObject(plumbing.ToHash("93e63b972b745f8766f5e529bc346e0d411ae36e"))
+	// fmt.Println(raw.Type)
+
+	// fmt.Println(r.GetReferences())
 }

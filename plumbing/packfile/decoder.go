@@ -9,6 +9,8 @@ import (
 	"github.com/liy/goe/plumbing/indexfile"
 )
 
+// TODO: remove, not used
+
 type ByteReader interface {
 	ReadByte() (byte, error)
 }
@@ -30,7 +32,7 @@ func (pack *Pack) Decode(packBytes []byte, idx *indexfile.Index) error {
 	pack.NumEntries = len(idx.Hashes)
 	pack.Objects = make([]*plumbing.RawObject, pack.NumEntries)
 
-	for i:=0; i<int(idx.NumObjects); i++  {
+	for i := 0; i < int(idx.NumObjects); i++ {
 		hash := *(*[20]byte)(idx.GetHash(i))
 		offset, _ := idx.GetOffset(hash)
 
@@ -71,11 +73,11 @@ func ReadVariableLength(reader ByteReader) int64 {
 	b, _ := reader.ReadByte()
 
 	var v = int64(b & 0x7F)
-	for b & 0x80 > 0 {
+	for b&0x80 > 0 {
 		v++
-		
+
 		b, _ = reader.ReadByte()
-		v = (v << 7) + int64(b & 0x7F)
+		v = (v << 7) + int64(b&0x7F)
 	}
 
 	return v
@@ -88,17 +90,15 @@ func ReadVariableLengthLE(reader ByteReader) int64 {
 
 	var v = int64(b & 0x7F)
 	shift := 7
-	for b & 0x80 > 0 {
-		
+	for b&0x80 > 0 {
+
 		b, _ = reader.ReadByte()
-		v = int64(b & 0x7F) << shift + v
+		v = int64(b&0x7F)<<shift + v
 		shift += 7
 	}
 
 	return v
 }
-
-
 
 // func Decode(packBytes []byte) (*Pack, error) {
 // 	pack := new(Pack)

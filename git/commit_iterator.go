@@ -11,20 +11,24 @@ import (
 var Done = errors.New("no more items in iterator")
 
 type CommitIterator struct {
-	visited map[plumbing.Hash]bool
-	queue *utils.PrioQueue
-	r *Repository
+	// Avoid process multiple commit
+	waiting map[plumbing.Hash]bool
+	queue   *utils.PrioQueue
+	r       *Repository
 }
 
 func NewCommitIterator(r *Repository, tips []*object.Commit) *CommitIterator {
 	itr := &CommitIterator{
-		visited:  make(map[plumbing.Hash]bool),
-		queue: &utils.PrioQueue{},
-		r: r,
+		waiting: make(map[plumbing.Hash]bool),
+		queue:   &utils.PrioQueue{},
+		r:       r,
 	}
 
 	for _, c := range tips {
-		itr.queue.Enqueue(c)
+		if !itr.waiting[c.Hash] {
+			itr.queue.Enqueue(c)
+		}
+		itr.waiting[c.Hash] = true
 	}
 
 	return itr
@@ -43,16 +47,16 @@ func (ci *CommitIterator) Next() (*object.Commit, error) {
 
 	// enqueue next commit's parents
 	for _, ph := range commit.Parents {
-		if _, exist := ci.visited[ph]; exist {
+		if ci.waiting[ph] {
 			continue
 		}
-		
-		ci.visited[ph] = true
+
 		p, err := ci.r.GetCommit(ph)
 		if err != nil {
-			return commit, errors.New("cannot get parent commit: " + ph.String()) 
+			return commit, errors.New("cannot get parent commit: " + ph.String())
 		}
 
+		ci.waiting[ph] = true
 		ci.queue.Enqueue(p)
 	}
 

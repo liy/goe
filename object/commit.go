@@ -4,34 +4,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/liy/goe/errors"
 	"github.com/liy/goe/plumbing"
 )
 
-
 type Commit struct {
-	Hash plumbing.Hash
-	Tree plumbing.Hash
-	Parents []plumbing.Hash
-	Author Signature
+	Hash      plumbing.Hash
+	Tree      plumbing.Hash
+	Parents   []plumbing.Hash
+	Author    Signature
 	Committer Signature
-	Message string
-}
-
-func (c *Commit) Decode(data []byte) error {
-	return ScanObjectData(data, func(key string, value []byte) {
-		switch key {
-		case "tree":
-			c.Tree = plumbing.ToHash(string(value))
-		case "parent":
-			c.Parents = append(c.Parents, plumbing.ToHash(string(value)))
-		case "author":
-			c.Author.Decode(value)
-		case "committer":
-			c.Committer.Decode(value)
-		case "message":
-			c.Message = string(value)
-		}
-	})
+	Message   string
 }
 
 func (c *Commit) GetCompareValue() int {
@@ -53,9 +36,28 @@ func (c Commit) String() string {
 }
 
 func DecodeCommit(raw *plumbing.RawObject) (*Commit, error) {
+	if raw.Type != plumbing.OBJ_COMMIT {
+		return nil, errors.ErrRawObjectTypeWrong
+	}
+
 	c := &Commit{
 		Hash: raw.Hash(),
 	}
-	err := c.Decode(raw.Data)
-	return c, err
+
+	ScanObjectData(raw.Data, func(key string, value []byte) {
+		switch key {
+		case "tree":
+			c.Tree = plumbing.ToHash(string(value))
+		case "parent":
+			c.Parents = append(c.Parents, plumbing.ToHash(string(value)))
+		case "author":
+			c.Author.Decode(value)
+		case "committer":
+			c.Committer.Decode(value)
+		case "message":
+			c.Message = string(value)
+		}
+	})
+
+	return c, nil
 }

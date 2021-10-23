@@ -23,6 +23,9 @@ var zlibBufferPool = sync.Pool{
 	},
 }
 
+/*
+decompressObjectData deflate the zlib object data
+*/
 func decompressObjectData(dst io.Writer, reader io.Reader) (int64, error) {
 	zReader := zlibReaderPool.Get().(io.ReadCloser)
 	zReader.(zlib.Resetter).Reset(reader, nil)

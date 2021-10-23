@@ -1,38 +1,98 @@
 package plumbing
 
-import "strings"
-
-const (
-	branchPath = "refs/heads/"
-	tagPath    = "refs/tags/"
-	remotePath = "refs/remotes/"
-	notePath   = "refs/notes/"
+import (
+	"strings"
 )
 
-type Reference struct {
-	Name string
-	target Hash
+// branch, directly target to commit
+// simple tag, direct target to object, recursive?
+// annotated tag, target to tag object, then target to object recursive?
+// HEAD can be referencing anything above, which means it points to another reference or directly points object
+const (
+	branchRef = "refs/heads/"
+	tagRef    = "refs/tags/"
+	noteRef   = "refs/notes/"
+	remoteRef = "refs/remotes/"
+)
+
+const symbolicRef = "ref: "
+
+func IsRemote(refname string) bool {
+	return strings.HasPrefix(refname, remoteRef)
 }
 
-func NewReference(name string, target Hash) *Reference {
+func IsBranch(refname string) bool {
+	return strings.HasPrefix(refname, branchRef)
+}
+
+func IsTag(refname string) bool {
+	return strings.HasPrefix(refname, tagRef)
+}
+
+func IsHead(refname string) bool {
+	return refname == "HEAD"
+}
+
+type ReferenceTarget string
+
+func (rt ReferenceTarget) IsRef() bool {
+	return strings.HasPrefix(string(rt), symbolicRef)
+}
+
+func (rt ReferenceTarget) IsHash() bool {
+	return !rt.IsRef()
+}
+
+func (rt ReferenceTarget) ReferenceName() string {
+	if rt.IsRef() {
+		return string(rt)[5:]
+	}
+	return string(rt)
+}
+
+func (rt ReferenceTarget) String() string {
+	return string(rt)
+}
+
+type Reference struct {
+	Name   string
+	Target ReferenceTarget
+}
+
+func NewReference(name string, target []byte) *Reference {
 	return &Reference{
-		name,
-		target,
+		Name:   name,
+		Target: ReferenceTarget(target),
 	}
 }
 
-func (r *Reference) IsRemote() bool {
-	return strings.HasPrefix(r.Name, remotePath)
-}
+// type ReferenceReader struct {
+// 	path       string
+// 	scanner    *bufio.Scanner
+// 	refReaders map[string]*bufio.Reader
+// }
 
-func (r *Reference) IsBranch() bool {
-	return strings.HasPrefix(r.Name, branchPath)
-}
+// func NewReferenceReader(repoPath string) *ReferenceReader {
+// 	var scanner *bufio.Scanner
+// 	file, err := os.Open(filepath.Join(repoPath, "packed-refs"))
+// 	if err != nil {
+// 		scanner = bufio.NewScanner(file)
+// 	}
 
-func (r *Reference) IsAnnotatedTag() bool {
+// 	return &ReferenceReader{
+// 		path:    repoPath,
+// 		scanner: scanner,
+// 	}
+// }
 
-}
+// func (n *ReferenceReader) head() string {
+// 	return filepath.Join(n.path, "HEAD")
+// }
 
-func (r *Reference) Target() Hash {
-	return r.target
-}
+// func (n *ReferenceReader) Read(refname ReferenceName) []byte {
+// 	if refname == "HEAD" {
+// 		if reader, ok := r.refReaders[r.head()]; ok {
+// 			return reader.ReadLine()
+// 		}
+// 	}
+// }

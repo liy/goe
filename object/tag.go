@@ -4,38 +4,24 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/liy/goe/errors"
 	"github.com/liy/goe/plumbing"
 )
 
 type Tag struct {
-	Hash plumbing.Hash
-	Target plumbing.Hash
+	Hash       plumbing.Hash
+	Target     plumbing.Hash
 	TargetType plumbing.ObjectType
-	Name string
-	Tagger Signature
-	Message string
+	Name       string
+	Tagger     Signature
+	Message    string
 }
 
-func NewTag(hash plumbing.Hash, message string) *Tag{
-	return &Tag {
-		Hash: hash,
+func NewTag(hash plumbing.Hash, message string) *Tag {
+	return &Tag{
+		Hash:    hash,
 		Message: message,
 	}
-}
-
-func (t *Tag) Decode(data []byte) error {
-	return ScanObjectData(data, func(key string, value []byte) {
-		switch key {
-		case "object":
-			t.Target = plumbing.ToHash(string(value))
-		case "type":
-			t.TargetType = plumbing.ToObjectType(string(value))
-		case "tag":
-			t.Name = string(value)
-		case "tagger":
-			t.Tagger.Decode(value)
-		}
-	})
 }
 
 func (t Tag) String() string {
@@ -51,9 +37,26 @@ func (t Tag) String() string {
 }
 
 func DecodeTag(raw *plumbing.RawObject) (*Tag, error) {
+	if raw.Type != plumbing.OBJ_COMMIT {
+		return nil, errors.ErrRawObjectTypeWrong
+	}
+
 	t := &Tag{
 		Hash: raw.Hash(),
 	}
-	err := t.Decode(raw.Data)
-	return t, err
+
+	ScanObjectData(raw.Data, func(key string, value []byte) {
+		switch key {
+		case "object":
+			t.Target = plumbing.ToHash(string(value))
+		case "type":
+			t.TargetType = plumbing.ToObjectType(string(value))
+		case "tag":
+			t.Name = string(value)
+		case "tagger":
+			t.Tagger.Decode(value)
+		}
+	})
+
+	return t, nil
 }
