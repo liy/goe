@@ -43,11 +43,14 @@ func (rt ReferenceTarget) IsHash() bool {
 	return !rt.IsRef()
 }
 
+/*
+ReferenceName can be a hash or another reference 
+*/
 func (rt ReferenceTarget) ReferenceName() string {
 	if rt.IsRef() {
-		return string(rt)[5:]
+		return strings.TrimSpace(string(rt)[5:])
 	}
-	return string(rt)
+	return strings.TrimSpace(string(rt))
 }
 
 func (rt ReferenceTarget) String() string {

@@ -2,15 +2,19 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/liy/goe/fixtures"
 	goe "github.com/liy/goe/git"
 	goeObject "github.com/liy/goe/object"
 	"github.com/liy/goe/plumbing"
+	"github.com/liy/goe/plumbing/indexfile"
+	"github.com/liy/goe/plumbing/packfile"
 	"github.com/liy/goe/src/protobuf"
 	ts "google.golang.org/protobuf/types/known/timestamppb"
 
@@ -258,7 +262,7 @@ func main() {
 	// s.Serve(listener)
 
 	// testRepository()
-	mine()
+	// mine()
 	// processed()
 	// defer profile.Start().Stop()
 
@@ -271,4 +275,12 @@ func main() {
 	// fmt.Println(raw.Type)
 
 	// fmt.Println(r.GetReferences())
+
+	fixture := fixtures.NewRepositoryFixture("topo-sort")
+	idxFile := fixture.IndexFile("./repos")
+	idx, _ := indexfile.Decode(idxFile)
+	packFile := fixture.PackFile("./repos")
+	pack := new(packfile.Pack)
+	bytes, _ := ioutil.ReadAll(packFile)
+	pack.Decode(bytes, idx)
 }
