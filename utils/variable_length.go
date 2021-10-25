@@ -3,7 +3,8 @@ package utils
 import "io"
 
 // Variable length encoding, with add 1 encoding
-func ReadVariableLength(reader io.ByteReader) int64 {
+// Only used to decode base object offset on OBJ_OFS_DELTA raw type object
+func ReadVariableOffset(reader io.ByteReader) int64 {
 	b, _ := reader.ReadByte()
 
 	var v = int64(b & 0x7F)
@@ -17,9 +18,9 @@ func ReadVariableLength(reader io.ByteReader) int64 {
 	return v
 }
 
-// Variable size encoding, without 1 encoding, little endian
-// This is used for reading delta deflated base size and deflated object size
-func ReadVariableLengthLE(reader io.ByteReader) int64 {
+// Variable size encoding, without 1 encoding, little endian.
+// This is used for decoding deflated base object size and deflated object size on OBJ_REF_DELTA object
+func ReadVariableSize(reader io.ByteReader) int64 {
 	b, _ := reader.ReadByte()
 
 	var v = int64(b & 0x7F)

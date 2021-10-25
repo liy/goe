@@ -111,11 +111,11 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 		decompressObjectData(buffer, pr)
 
 		// For error checking only
-		baseSize := utils.ReadVariableLengthLE(buffer)
+		baseSize := utils.ReadVariableSize(buffer)
 		if rawBase.DeflatedSize != baseSize {
 			return fmt.Errorf("wrong base object size")
 		}
-		raw.DeflatedSize = utils.ReadVariableLengthLE(buffer)
+		raw.DeflatedSize = utils.ReadVariableSize(buffer)
 
 		baseReader := bytes.NewReader(rawBase.Data)
 		err = pr.deltaPatch(buffer, baseReader, raw)
@@ -124,7 +124,7 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 		}
 	} else if raw.RawType == plumbing.OBJ_OFS_DELTA { // base object is specified by offset
 		// Read the negative offset to the base object
-		baseOffset := offset - utils.ReadVariableLength(pr)
+		baseOffset := offset - utils.ReadVariableOffset(pr)
 
 		hb, ok := pr.GetHashFromOffset(uint64(baseOffset))
 		if !ok {
@@ -153,11 +153,11 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 		decompressObjectData(buffer, pr)
 
 		// For error checking only
-		baseSize := utils.ReadVariableLengthLE(buffer)
+		baseSize := utils.ReadVariableSize(buffer)
 		if rawBase.DeflatedSize != baseSize {
 			return fmt.Errorf("wrong base object size")
 		}
-		raw.DeflatedSize = utils.ReadVariableLengthLE(buffer)
+		raw.DeflatedSize = utils.ReadVariableSize(buffer)
 
 		baseReader := bytes.NewReader(rawBase.Data)
 		err := pr.deltaPatch(buffer, baseReader, raw)

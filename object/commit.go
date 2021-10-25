@@ -1,7 +1,10 @@
 package object
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/liy/goe/errors"
@@ -44,20 +47,46 @@ func DecodeCommit(raw *plumbing.RawObject) (*Commit, error) {
 		Hash: raw.Hash(),
 	}
 
-	ScanObjectData(raw.Data, func(key string, value []byte) {
-		switch key {
-		case "tree":
-			c.Tree = plumbing.ToHash(string(value))
-		case "parent":
-			c.Parents = append(c.Parents, plumbing.ToHash(string(value)))
-		case "author":
-			c.Author.Decode(value)
-		case "committer":
-			c.Committer.Decode(value)
-		case "message":
-			c.Message = string(value)
+	buf := bufferPool.Get().(*bufio.Reader)
+	buf.Reset(bytes.NewReader(raw.Data))
+	defer bufferPool.Put(buf)
+
+	for {
+		line, err := buf.ReadBytes('\n')
+		if err == io.EOF {
+			break
 		}
-	})
+
+		// message starts from the first empty line
+		line = bytes.TrimRight(line, "\n")
+		if len(line) == 0 {
+			break
+		}
+
+		chunks := bytes.SplitN(line, []byte{' '}, 2)
+		
+		switch string(chunks[0]) {
+			case "tree":
+				c.Tree = plumbing.ToHash(string(chunks[1]))
+			case "parent":
+				c.Parents = append(c.Parents, plumbing.ToHash(string(chunks[1])))
+			case "author":
+				c.Author.Decode(chunks[1])
+			case "committer":
+				c.Committer.Decode(chunks[1])
+		}
+	}
+
+	var msg bytes.Buffer
+	for {
+		line, err := buf.ReadBytes('\n')
+		msg.Write(line)
+
+		if err == io.EOF {
+			break
+		}
+	}
+	c.Message = msg.String()
 
 	return c, nil
 }

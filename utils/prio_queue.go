@@ -1,5 +1,8 @@
 package utils
 
+/*
+Copied from git c code
+*/
 import (
 	"fmt"
 	"strings"

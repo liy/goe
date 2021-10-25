@@ -29,7 +29,7 @@ type LRU struct {
 	mutex sync.Mutex
 }
 
-func NewLRU(maxSize int64) Cache{
+func NewLRU(maxSize int64) *LRU {
 	return &LRU{
 		MaxSize: maxSize,
 		lst: list.New(),

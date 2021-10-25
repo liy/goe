@@ -69,8 +69,12 @@ type Hash [20]byte
 
 var ZeroHash Hash
 
-func (h *Hash) Bytes() *[20]byte {
-	return (*[20]byte)(h)
+func (h Hash) Bytes() *[20]byte {
+	return (*[20]byte)(&h)
+}
+
+func (h Hash) Slice() []byte {
+	return (*h.Bytes())[:]
 }
 
 func (h Hash) Short() string {

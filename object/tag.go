@@ -1,7 +1,10 @@
 package object
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/liy/goe/errors"
@@ -45,18 +48,35 @@ func DecodeTag(raw *plumbing.RawObject) (*Tag, error) {
 		Hash: raw.Hash(),
 	}
 
-	ScanObjectData(raw.Data, func(key string, value []byte) {
-		switch key {
-		case "object":
-			t.Target = plumbing.ToHash(string(value))
-		case "type":
-			t.TargetType = plumbing.ToObjectType(string(value))
-		case "tag":
-			t.Name = string(value)
-		case "tagger":
-			t.Tagger.Decode(value)
+	buf := bufferPool.Get().(*bufio.Reader)
+	buf.Reset(bytes.NewReader(raw.Data))
+	defer bufferPool.Put(buf)
+
+	for {
+		line, err := buf.ReadBytes('\n')
+		if err == io.EOF {
+			break
 		}
-	})
+
+		// message starts from the first empty line
+		line = bytes.TrimRight(line, "\n")
+		if len(line) == 0 {
+			break
+		}
+
+		chunks := bytes.SplitN(line, []byte{' '}, 2)
+
+		switch string(chunks[0]) {
+		case "object":
+			t.Target = plumbing.ToHash(string(chunks[1]))
+		case "type":
+			t.TargetType = plumbing.ToObjectType(string(chunks[1]))
+		case "tag":
+			t.Name = string(chunks[1])
+		case "tagger":
+			t.Tagger.Decode(chunks[1])
+		}
+	}
 
 	return t, nil
 }
