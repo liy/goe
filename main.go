@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"strings"
 	"time"
@@ -278,9 +277,8 @@ func main() {
 
 	fixture := fixtures.NewRepositoryFixture("topo-sort")
 	idxFile := fixture.IndexFile("./repos")
-	idx, _ := indexfile.Decode(idxFile)
 	packFile := fixture.PackFile("./repos")
-	pack := new(packfile.Pack)
-	bytes, _ := ioutil.ReadAll(packFile)
-	pack.Decode(bytes, idx)
+	
+	idx, _ := indexfile.Decode(idxFile)
+	packfile.Decode(packFile, idx)
 }

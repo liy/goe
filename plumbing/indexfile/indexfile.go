@@ -31,7 +31,7 @@ func NewIndex(path string) *Index{
 	return idx
 }
  
-func (idx *Index) getOffset(position int) int64 {
+func (idx *Index) GetOffsetAt(position int) int64 {
 	// Mask out the MSB to construct offset
 	i := position*4
 	offset := binary.BigEndian.Uint32(idx.Offset32[i : i+4]) & ^MSB_MASK_32
@@ -82,7 +82,7 @@ func (idx *Index) GetOffset(hash plumbing.Hash) (int64, bool) {
 		midIdx := mid*20
 		r := bytes.Compare(hash[:], idx.Hashes[midIdx:midIdx+20])
 		if r == 0 {
-			return idx.getOffset(int(mid)), true	
+			return idx.GetOffsetAt(int(mid)), true	
 		} else if r == -1 {
 			high = mid
 		} else {
