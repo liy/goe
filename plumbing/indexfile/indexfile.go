@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"io"
 	"os"
 
 	"github.com/liy/goe/plumbing"
@@ -28,6 +29,11 @@ func NewIndex(path string) *Index{
 	// bytes, _ := ioutil.ReadFile(path)
 	file, _ := os.Open(path)
 	idx, _ := Decode(bufio.NewReader(file))
+	return idx
+}
+
+func NewIndex2(reader io.Reader) *Index {
+	idx, _ := Decode(bufio.NewReader(reader))
 	return idx
 }
  

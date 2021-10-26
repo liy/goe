@@ -9,46 +9,47 @@ import (
 	"strings"
 
 	"github.com/liy/goe/errors"
+	"github.com/liy/goe/fs"
 	"github.com/liy/goe/object"
 	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/plumbing/packfile"
 )
 
 type Repository struct {
-	path        string
+	dotgit		fs.DotGit
 	packReaders []packfile.PackReader
 }
 
 func OpenRepository(path string) (repo *Repository, err error) {
-	if path, err = filepath.Abs(filepath.Join(path, ".git")); err != nil {
-		return nil, err
-	}
+	dotgit := fs.NewFileSystem(filepath.Join(path, ".git"))
 
-	packFiles, err := filepath.Glob(filepath.Join(path, "objects/pack", "*.pack"))
+	packFiles, err := filepath.Glob(filepath.Join(dotgit.Root(), "objects/pack", "*.pack"))
 	if err != nil {
 		return nil, err
 	}
 
 	var readers []packfile.PackReader = make([]packfile.PackReader, len(packFiles))
-	for i, p := range packFiles {
-		readers[i] = *packfile.NewPackReader(p)
+	for i, packName := range packFiles {
+		pack, err := dotgit.Pack(packName)
+		if err != nil {
+			return nil, err
+		}
+		idx, err := dotgit.PackIndex(packName[:len(packName)-4] + "idx")
+		if err != nil {
+			return nil, err
+		}
+
+		readers[i] = *packfile.NewPackReader2(pack, idx)
 	}
 
 	return &Repository{
-		path,
+		dotgit,
 		readers,
 	}, nil
 }
 
 func (r *Repository) ReadObjectFile(hash plumbing.Hash) (*plumbing.RawObject, error) {
-	h := hash.String()
-	p := filepath.Join(r.path, "objects", h[:2], h[2:])
-	_, err := os.Stat(p)
-	if os.IsNotExist(err) {
-		return nil, errors.ErrObjectNotFound
-	}
-
-	file, err := os.Open(p)
+	file, err := r.dotgit.Object(hash.String())
 	if err != nil {
 		return nil, err
 	}
@@ -165,11 +166,11 @@ func (r *Repository) GetAnnotatedTag(hash plumbing.Hash) (t *object.Tag, err err
 }
 
 func (r *Repository) GetPath() string {
-	return r.path
+	return r.dotgit.Root()
 }
 
 func (r *Repository) traverseRefs(relativePaths []string, references *[]*plumbing.Reference, packed *map[string]bool) error {
-	fullPath := append([]string{r.path}, relativePaths...)
+	fullPath := append([]string{r.dotgit.Root()}, relativePaths...)
 	ab := filepath.Join(fullPath...)
 	folder, err := os.Open(ab)
 	if err != nil {
@@ -197,7 +198,7 @@ func (r *Repository) traverseRefs(relativePaths []string, references *[]*plumbin
 				continue
 			}
 
-			data, err := ioutil.ReadFile(filepath.Join(r.path, refname))
+			data, err := ioutil.ReadFile(filepath.Join(r.dotgit.Root(), refname))
 			if err != nil {
 				return err
 			}
@@ -214,7 +215,7 @@ func (r *Repository) GetReferences() []*plumbing.Reference {
 
 	// record all packed references
 	packed := make(map[string]bool, 0)
-	file, err := os.Open(filepath.Join(r.path, "packed-refs"))
+	file, err := os.Open(filepath.Join(r.dotgit.Root(), "packed-refs"))
 	if err == nil {
 		defer file.Close()
 
@@ -250,7 +251,7 @@ func (r *Repository) GetReferences() []*plumbing.Reference {
 
 // symbolic reference which reference to another reference
 func (r *Repository) HEAD() (*plumbing.Reference, error) {
-	data, err := ioutil.ReadFile(filepath.Join(r.path, "HEAD"))
+	data, err := ioutil.ReadFile(filepath.Join(r.dotgit.Root(), "HEAD"))
 	if err != nil {
 		return nil, errors.ErrReferenceNoteFound
 	}
@@ -291,7 +292,7 @@ func (r *Repository) GetRemoteTag(tagName string, remoteName string) (*plumbing.
 
 func (r *Repository) GetReference(refname string) (*plumbing.Reference, error) {
 	// Try packed-refs first
-	file, err := os.Open(filepath.Join(r.path, "packed-refs"))
+	file, err := os.Open(filepath.Join(r.dotgit.Root(), "packed-refs"))
 	if err == nil {
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
@@ -312,7 +313,7 @@ func (r *Repository) GetReference(refname string) (*plumbing.Reference, error) {
 	}
 
 	// then refs folder
-	lineBytes, err := ioutil.ReadFile(filepath.Join(r.path, string(refname)))
+	lineBytes, err := ioutil.ReadFile(filepath.Join(r.dotgit.Root(), string(refname)))
 	if err != nil {
 		return nil, errors.ErrReferenceNoteFound
 	}

@@ -119,7 +119,7 @@ func mine() {
 	}
 
 	_ = protobuf.Repository{
-		Path:       r.GetPath(),
+		Path:       "",
 		Commits:    commits,
 		References: references,
 		Head:       &head,

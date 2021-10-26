@@ -39,6 +39,15 @@ func NewPackReader(packPath string) *PackReader {
 	}
 }
 
+func NewPackReader2(pack io.ReadSeeker, idx io.Reader) *PackReader {
+	return &PackReader{
+		Index:     indexfile.NewIndex2(idx),
+		file:      pack,
+		bufReader: bufio.NewReader(pack),
+		cache:     utils.NewLRU(int64(5 * 1024 * 1024)),
+	}
+}
+
 func NewPackReaderFromFile(file *os.File, idx *indexfile.Index) *PackReader {
 	return &PackReader{
 		Index:     idx,
