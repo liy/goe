@@ -99,6 +99,7 @@ func NewHash(bs []byte) Hash {
 
 type RawObject struct {
 	hash Hash
+	// TODO: rename this?
 	// RawType can be normal OBJ_COMMIT, OBJ_TAG, OBJ_BLOB or OBJ_TREE objects
 	// but it can also be a delta of another object which means it can als be
 	// OBJ_OFS_DELTA and OBJ_REF_DELTA
@@ -141,10 +142,10 @@ var bufferPool = sync.Pool{
 	},
 }
 
-func (raw *RawObject) ReadFile(reader io.Reader) (int64, error) {
+func (raw *RawObject) ReadFile(reader io.Reader) error {
 	zReader, err := zlib.NewReader(reader)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer zReader.Close()
 
@@ -155,25 +156,26 @@ func (raw *RawObject) ReadFile(reader io.Reader) (int64, error) {
 	// type
 	t, err := buf.ReadString(' ')
 	if err != nil {
-		return 0, err
+		return err
 	}
 	raw.Type = ToObjectType(string(t[:len(t)-1]))
-	n := len(t)
+	
+	// Raw type is as same as the object type, since it is not loaded from pack file
+	raw.RawType = raw.Type
 
 	// size
 	s, err := buf.ReadString(0)
 	if err != nil {
-		return int64(n), err
+		return err
 	}
 	raw.DeflatedSize, err = strconv.ParseInt(s[:len(s)-1], 10, 64)
 	if err != nil {
-		return int64(n), err
+		return err
 	}
-	n += len(s)
 
 	// data
 	raw.Data = make([]byte, raw.DeflatedSize)
 	_, err = buf.Read(raw.Data)
 
-	return int64(n) + raw.DeflatedSize, err
+	return err
 }

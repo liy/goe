@@ -1,4 +1,4 @@
-package fixtures
+package tests
 
 import (
 	"fmt"
@@ -27,11 +27,11 @@ var fixtures = []RepositoryFixture{
 	},
 }
 
-func GetRepositoryFixtures() []RepositoryFixture {
+func GetFixtures() []RepositoryFixture {
 	return fixtures
 }
 
-func NewRepositoryFixture(name string) *RepositoryFixture {
+func GetFixture(name string) *RepositoryFixture {
 	for _, f := range fixtures {
 		if f.Name == name {
 			return &f

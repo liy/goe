@@ -1,4 +1,4 @@
-package utils
+package git
 
 /*
 Copied from git c code
@@ -6,38 +6,38 @@ Copied from git c code
 import (
 	"fmt"
 	"strings"
+
+	"github.com/liy/goe/object"
 )
 
-type Comparable interface {
-	GetCompareValue() int
-}
-
-type PrioQueueItem struct {
-	object       *Comparable
+type CommitRank struct {
+	commit       *object.Commit
 	enqueueIndex int
 }
 
-type PrioQueue struct {
-	queue []*PrioQueueItem
+func (cr *CommitRank) GetRank() int {
+	return int(cr.commit.Author.TimeStamp.Unix())
 }
 
-func (q PrioQueue) String() string {
+type CommitPrioQueue struct {
+	queue []CommitRank
+}
+
+func (q CommitPrioQueue) String() string {
 	var sb strings.Builder
 	fmt.Fprint(&sb, "[")
 	for _, item := range q.queue {
-		fmt.Fprintf(&sb, "%v ", (*(item.object)).GetCompareValue())
+		fmt.Fprintf(&sb, "%v ", item.GetRank())
 	}
 	fmt.Fprint(&sb, "]")
 	return sb.String()
 }
 
-func (q *PrioQueue) Enqueue(object Comparable) {
-	item := &PrioQueueItem{
-		&object,
+func (q *CommitPrioQueue) Enqueue(commit *object.Commit) {
+	q.queue = append(q.queue, CommitRank{
+		commit,
 		len(q.queue),
-	}
-
-	q.queue = append(q.queue, item)
+	})
 
 	var child int
 	for i := len(q.queue) - 1; i > 0; i = child {
@@ -50,14 +50,14 @@ func (q *PrioQueue) Enqueue(object Comparable) {
 	}
 }
 
-func (q *PrioQueue) Dequeue() *Comparable {
+func (q *CommitPrioQueue) Dequeue() *object.Commit {
 	if len(q.queue) == 0 {
 		return nil
 	}
 
 	result := q.queue[0]
 	if len(q.queue) == 0 {
-		return result.object
+		return result.commit
 	}
 
 	q.queue[0] = q.queue[len(q.queue)-1]
@@ -79,31 +79,31 @@ func (q *PrioQueue) Dequeue() *Comparable {
 		q.swap(child, i)
 	}
 
-	return result.object
+	return result.commit
 }
 
-func (q *PrioQueue) compare(a int, b int) int {
-	if (*(q.queue[a].object)).GetCompareValue() < (*(q.queue[b].object)).GetCompareValue() {
+func (q *CommitPrioQueue) compare(a int, b int) int {
+	if q.queue[a].GetRank() < q.queue[b].GetRank() {
 		return 1
-	} else if (*(q.queue[a].object)).GetCompareValue() > (*(q.queue[b].object)).GetCompareValue() {
+	} else if q.queue[a].GetRank() > q.queue[b].GetRank() {
 		return -1
 	} else {
 		return q.queue[a].enqueueIndex - q.queue[b].enqueueIndex
 	}
 }
 
-func (q *PrioQueue) swap(a int, b int) {
+func (q *CommitPrioQueue) swap(a int, b int) {
 	t := q.queue[a]
 	q.queue[a] = q.queue[b]
 	q.queue[b] = t
 }
 
-func (q *PrioQueue) Size() int {
+func (q *CommitPrioQueue) Size() int {
 	return len(q.queue)
 }
 
-func (q *PrioQueue) ForEach(callback func(*Comparable, int)) {
+func (q *CommitPrioQueue) ForEach(callback func(CommitRank, int)) {
 	for i, o := range q.queue {
-		callback(o.object, i)
+		callback(o, i)
 	}
 }

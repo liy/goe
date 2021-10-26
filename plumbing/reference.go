@@ -1,6 +1,7 @@
 package plumbing
 
 import (
+	"regexp"
 	"strings"
 )
 
@@ -22,7 +23,8 @@ func IsRemote(refname string) bool {
 }
 
 func IsBranch(refname string) bool {
-	return strings.HasPrefix(refname, branchRef)
+	// local branch or remote branches which is not HEAD
+	return strings.HasPrefix(refname, branchRef) || (IsRemote(refname) && !strings.HasSuffix(refname, "HEAD"))
 }
 
 func IsTag(refname string) bool {
@@ -30,24 +32,28 @@ func IsTag(refname string) bool {
 }
 
 func IsHead(refname string) bool {
-	return refname == "HEAD"
+	mached, err := regexp.MatchString(`refs\/remotes\/\w+\/HEAD`, refname)
+	if err != nil {
+		return false
+	}
+	return refname == "HEAD" || mached
 }
 
 type ReferenceTarget string
 
-func (rt ReferenceTarget) IsRef() bool {
+func (rt ReferenceTarget) IsReference() bool {
 	return strings.HasPrefix(string(rt), symbolicRef)
 }
 
 func (rt ReferenceTarget) IsHash() bool {
-	return !rt.IsRef()
+	return !rt.IsReference()
 }
 
 /*
 ReferenceName can be a hash or another reference 
 */
 func (rt ReferenceTarget) ReferenceName() string {
-	if rt.IsRef() {
+	if rt.IsReference() {
 		return strings.TrimSpace(string(rt)[5:])
 	}
 	return strings.TrimSpace(string(rt))
@@ -69,33 +75,6 @@ func NewReference(name string, target []byte) *Reference {
 	}
 }
 
-// type ReferenceReader struct {
-// 	path       string
-// 	scanner    *bufio.Scanner
-// 	refReaders map[string]*bufio.Reader
-// }
-
-// func NewReferenceReader(repoPath string) *ReferenceReader {
-// 	var scanner *bufio.Scanner
-// 	file, err := os.Open(filepath.Join(repoPath, "packed-refs"))
-// 	if err != nil {
-// 		scanner = bufio.NewScanner(file)
-// 	}
-
-// 	return &ReferenceReader{
-// 		path:    repoPath,
-// 		scanner: scanner,
-// 	}
-// }
-
-// func (n *ReferenceReader) head() string {
-// 	return filepath.Join(n.path, "HEAD")
-// }
-
-// func (n *ReferenceReader) Read(refname ReferenceName) []byte {
-// 	if refname == "HEAD" {
-// 		if reader, ok := r.refReaders[r.head()]; ok {
-// 			return reader.ReadLine()
-// 		}
-// 	}
-// }
+func (r Reference) IsSymbolic() bool {
+	return r.Target.IsReference()
+}

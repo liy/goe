@@ -1,7 +1,6 @@
-package utils
+package tests
 
 import (
-	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -9,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func getType(o interface{}) (res string) {
@@ -51,8 +52,6 @@ func ToMatchSnapshot(t *testing.T, o interface{}) {
 			t.Fatal(err)
 		}
 
-		if !bytes.Equal(expectedBytes, bs) {
-			t.Fatal("does not match snapshot")
-		}
+		require.JSONEq(t, string(expectedBytes), string(bs))
 	}
 }

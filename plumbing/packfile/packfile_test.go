@@ -5,15 +5,15 @@ import (
 	"io"
 	"testing"
 
-	"github.com/liy/goe/fixtures"
 	"github.com/liy/goe/plumbing"
+	"github.com/liy/goe/tests"
 	"github.com/stretchr/testify/assert"
 )
 
 var packReader *PackReader
 
 func init() {
-	fixture := fixtures.NewRepositoryFixture("topo-sort")
+	fixture := tests.GetFixture("topo-sort")
 	packReader = NewPackReader(fixture.GetPackFilePath("../../repos"))
 }
 

@@ -6,6 +6,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/liy/goe/tests"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,4 +41,9 @@ func TestRawObjectWrite(t *testing.T) {
 
 	assert.Equal(t, []byte{2, 12, 22, 33, 44}, raw.Data, "Can use RawObject as a writer")
 	assert.Equal(t, 4, int(numBytes), "Correct number bytes written to raw object")
+}
+
+func TestReadFile(t *testing.T) {
+	raw := GetRawObject(t, "f2010ee942a47bec0ca7e8f04240968ea5200735")
+	tests.ToMatchSnapshot(t, raw)
 }

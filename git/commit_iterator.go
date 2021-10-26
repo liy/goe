@@ -1,11 +1,10 @@
-package goe
+package git
 
 import (
 	"errors"
 
 	"github.com/liy/goe/object"
 	"github.com/liy/goe/plumbing"
-	"github.com/liy/goe/utils"
 )
 
 var Done = errors.New("no more items in iterator")
@@ -13,14 +12,14 @@ var Done = errors.New("no more items in iterator")
 type CommitIterator struct {
 	// Avoid process multiple commit
 	waiting map[plumbing.Hash]bool
-	queue   *utils.PrioQueue
+	queue   *CommitPrioQueue
 	r       *Repository
 }
 
 func NewCommitIterator(r *Repository, tips []*object.Commit) *CommitIterator {
 	itr := &CommitIterator{
 		waiting: make(map[plumbing.Hash]bool),
-		queue:   &utils.PrioQueue{},
+		queue:   &CommitPrioQueue{},
 		r:       r,
 	}
 
@@ -40,10 +39,7 @@ func (ci *CommitIterator) Next() (*object.Commit, error) {
 	}
 
 	// try to get the next commit
-	commit, ok := (*ci.queue.Dequeue()).(*object.Commit)
-	if !ok {
-		return nil, errors.New("not a commit object")
-	}
+	commit := ci.queue.Dequeue()
 
 	// enqueue next commit's parents
 	for _, ph := range commit.Parents {

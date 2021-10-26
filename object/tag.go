@@ -11,12 +11,21 @@ import (
 	"github.com/liy/goe/plumbing"
 )
 
+/*
+Tag represents an annotated tag in git.
+*/
 type Tag struct {
+	// The hash of the annotated tag object
 	Hash       plumbing.Hash
+	// The object that tag points to
 	Target     plumbing.Hash
+	// The object's type that tag points to
 	TargetType plumbing.ObjectType
+	// Name of the tag
 	Name       string
+	// The creator of the tag
 	Tagger     Signature
+	// Message of the tag
 	Message    string
 }
 

@@ -3,13 +3,12 @@ package packfile
 import (
 	"testing"
 
-	"github.com/liy/goe/fixtures"
 	"github.com/liy/goe/plumbing/indexfile"
-	"github.com/liy/goe/utils"
+	"github.com/liy/goe/tests"
 )
 
 func TestDecode(t *testing.T) {
-	fixture := fixtures.NewRepositoryFixture("topo-sort")
+	fixture := tests.GetFixture("topo-sort")
 	idxFile := fixture.IndexFile("../../repos")
 	packFile := fixture.PackFile("../../repos")
 	
@@ -19,5 +18,5 @@ func TestDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	utils.ToMatchSnapshot(t, pack)
+	tests.ToMatchSnapshot(t, pack)
 }

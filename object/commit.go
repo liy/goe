@@ -11,6 +11,21 @@ import (
 	"github.com/liy/goe/plumbing"
 )
 
+type ParentError struct {
+	Hash plumbing.Hash
+}
+
+func NewParentError(hash plumbing.Hash) *ParentError {
+	return &ParentError{
+		hash,
+	}
+}
+
+func (e *ParentError) Error() string {
+    return fmt.Sprintf("cannot get parent commit: %s", e.Hash.String())
+}
+
+
 type Commit struct {
 	Hash      plumbing.Hash
 	Tree      plumbing.Hash
@@ -18,10 +33,6 @@ type Commit struct {
 	Author    Signature
 	Committer Signature
 	Message   string
-}
-
-func (c *Commit) GetCompareValue() int {
-	return int(c.Author.TimeStamp.Unix())
 }
 
 func (c Commit) String() string {

@@ -1,10 +1,10 @@
-package goe
+package git
 
 import (
 	"testing"
 
 	"github.com/liy/goe/plumbing"
-	"github.com/liy/goe/utils"
+	"github.com/liy/goe/tests"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,14 +33,14 @@ func TestTryPeel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetRef := repo.TryPeel(ref.Target)
-	assert.Equal(t, "f2010ee942a47bec0ca7e8f04240968ea5200735", targetRef.ReferenceName(), "HEAD pointed to dev branch tip commit")
+	hash := repo.Peel(ref)
+	assert.Equal(t, "f2010ee942a47bec0ca7e8f04240968ea5200735", hash.String(), "HEAD pointed to dev branch tip commit")
 }
 
 func TestGetReferences(t *testing.T) {
 	refs := repo.GetReferences()
 	
-	utils.ToMatchSnapshot(t, refs)
+	tests.ToMatchSnapshot(t, refs)
 }
 
 func TestGetCommit(t *testing.T) {
@@ -52,7 +52,7 @@ func TestGetCommit(t *testing.T) {
 	assert.True(t, len(c.Parents) == 1, "only has 1 parent")
 	assert.Equal(t, "c53c4c18e245d880899405c07eb4d01b735b72ad", c.Parents[0].String(), "has correct parent commit")
 	assert.Equal(t, "Fix package keywords.\n", c.Message, "commit has correct message")
-	utils.ToMatchSnapshot(t, c)
+	tests.ToMatchSnapshot(t, c)
 }
 
 func TestGetCommits(t *testing.T) {
@@ -61,7 +61,7 @@ func TestGetCommits(t *testing.T) {
 		t.Fatal(err)
 	}
 	
-	utils.ToMatchSnapshot(t, cs)
+	tests.ToMatchSnapshot(t, cs)
 }
 
 func TestGetAnnotatedTag(t *testing.T) {
@@ -70,7 +70,7 @@ func TestGetAnnotatedTag(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	utils.ToMatchSnapshot(t, tag)
+	tests.ToMatchSnapshot(t, tag)
 }
 
 func TestReadObject(t *testing.T) {
@@ -79,5 +79,5 @@ func TestReadObject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	utils.ToMatchSnapshot(t, obj)
+	tests.ToMatchSnapshot(t, obj)
 }

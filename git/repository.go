@@ -1,19 +1,17 @@
-package goe
+package git
 
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
-	goeErrors "github.com/liy/goe/errors"
+	"github.com/liy/goe/errors"
 	"github.com/liy/goe/object"
 	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/plumbing/packfile"
-	"github.com/liy/goe/utils"
 )
 
 type Repository struct {
@@ -47,7 +45,7 @@ func (r *Repository) ReadObjectFile(hash plumbing.Hash) (*plumbing.RawObject, er
 	p := filepath.Join(r.path, "objects", h[:2], h[2:])
 	_, err := os.Stat(p)
 	if os.IsNotExist(err) {
-		return nil, goeErrors.ErrObjectNotFound
+		return nil, errors.ErrObjectNotFound
 	}
 
 	file, err := os.Open(p)
@@ -56,7 +54,7 @@ func (r *Repository) ReadObjectFile(hash plumbing.Hash) (*plumbing.RawObject, er
 	}
 
 	raw := plumbing.NewRawObject(hash)
-	_, err = raw.ReadFile(file)
+	err = raw.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +66,7 @@ func (r *Repository) ReadObject(hash plumbing.Hash) (raw *plumbing.RawObject, er
 	// Try find it in all packed files
 	for _, pr := range r.packReaders {
 		raw, err = pr.ReadObject(hash)
-		if err == goeErrors.ErrObjectNotFound {
+		if err == errors.ErrObjectNotFound {
 			continue
 		} else if err != nil {
 			return nil, err
@@ -90,7 +88,7 @@ func (r *Repository) GetCommit(hash plumbing.Hash) (c *object.Commit, err error)
 	var raw *plumbing.RawObject
 	for _, pr := range r.packReaders {
 		raw, err = pr.ReadObject(hash)
-		if err == goeErrors.ErrObjectNotFound {
+		if err == errors.ErrObjectNotFound {
 			continue
 		} else if err != nil {
 			return nil, err
@@ -113,7 +111,7 @@ func (r *Repository) GetCommits(hash plumbing.Hash) ([]*object.Commit, error) {
 	if err != nil {
 		return nil, err
 	}
-	queue := utils.PrioQueue{}
+	queue := CommitPrioQueue{}
 	queue.Enqueue(start)
 
 	// count := 0
@@ -121,10 +119,7 @@ func (r *Repository) GetCommits(hash plumbing.Hash) ([]*object.Commit, error) {
 	visited := make(map[plumbing.Hash]bool)
 
 	for {
-		commit, ok := (*queue.Dequeue()).(*object.Commit)
-		if !ok {
-			return nil, errors.New("not a commit object")
-		}
+		commit := queue.Dequeue()
 		commits = append(commits, commit)
 
 		for _, ph := range commit.Parents {
@@ -132,7 +127,7 @@ func (r *Repository) GetCommits(hash plumbing.Hash) ([]*object.Commit, error) {
 				visited[ph] = true
 				p, err := r.GetCommit(ph)
 				if err != nil {
-					return nil, errors.New("cannot get parent commit: " + ph.String())
+					return nil, object.NewParentError(ph)
 				}
 
 				queue.Enqueue(p)
@@ -151,7 +146,7 @@ func (r *Repository) GetAnnotatedTag(hash plumbing.Hash) (t *object.Tag, err err
 	var raw *plumbing.RawObject
 	for _, pr := range r.packReaders {
 		raw, err = pr.ReadObject(hash)
-		if err == goeErrors.ErrObjectNotFound {
+		if err == errors.ErrObjectNotFound {
 			continue
 		} else if err != nil {
 			return nil, err
@@ -173,7 +168,7 @@ func (r *Repository) GetPath() string {
 	return r.path
 }
 
-func (r *Repository) traverseRefs(relativePaths []string, references *[]plumbing.Reference, packed *map[string]bool) error {
+func (r *Repository) traverseRefs(relativePaths []string, references *[]*plumbing.Reference, packed *map[string]bool) error {
 	fullPath := append([]string{r.path}, relativePaths...)
 	ab := filepath.Join(fullPath...)
 	folder, err := os.Open(ab)
@@ -207,15 +202,15 @@ func (r *Repository) traverseRefs(relativePaths []string, references *[]plumbing
 				return err
 			}
 
-			*references = append(*references, *plumbing.NewReference(refname, bytes.TrimSpace(data)))
+			*references = append(*references, plumbing.NewReference(refname, bytes.TrimSpace(data)))
 		}
 	}
 
 	return nil
 }
 
-func (r *Repository) GetReferences() []plumbing.Reference {
-	refs := make([]plumbing.Reference, 0)
+func (r *Repository) GetReferences() []*plumbing.Reference {
+	refs := make([]*plumbing.Reference, 0)
 
 	// record all packed references
 	packed := make(map[string]bool, 0)
@@ -233,7 +228,7 @@ func (r *Repository) GetReferences() []plumbing.Reference {
 			}
 
 			chunks := bytes.SplitN(lineBytes, []byte{' '}, 2)
-			refs = append(refs, *plumbing.NewReference(string(chunks[1]), chunks[0]))
+			refs = append(refs, plumbing.NewReference(string(chunks[1]), chunks[0]))
 			packed[string(chunks[1])] = true
 		}
 	}
@@ -247,7 +242,7 @@ func (r *Repository) GetReferences() []plumbing.Reference {
 	// Head
 	ref, err := r.HEAD()
 	if err == nil {
-		refs = append(refs, *ref)
+		refs = append(refs, ref)
 	}
 
 	return refs
@@ -257,129 +252,42 @@ func (r *Repository) GetReferences() []plumbing.Reference {
 func (r *Repository) HEAD() (*plumbing.Reference, error) {
 	data, err := ioutil.ReadFile(filepath.Join(r.path, "HEAD"))
 	if err != nil {
-		return nil, goeErrors.ErrReferenceNoteFound
+		return nil, errors.ErrReferenceNoteFound
 	}
 
 	return plumbing.NewReference("HEAD", bytes.TrimSpace(data)), nil
 }
 
-func (r *Repository) TryPeel(refTarget plumbing.ReferenceTarget) plumbing.ReferenceTarget {
-	if refTarget.IsHash() {
-		return refTarget
+func (r *Repository) Peel(reference *plumbing.Reference) plumbing.Hash {
+	if reference.Target.IsHash() {
+		return plumbing.ToHash(reference.Target.String())
 	}
 
-	ref, err := r.GetReference(refTarget.ReferenceName())
+	// symbolic reference points to another ref
+	ref, err := r.GetReference(reference.Target.ReferenceName())
+	// the pointed reference does not exist
 	if err != nil {
-		return ""
+		return plumbing.ZeroHash
 	}
 
-	if ref.Target.IsRef() {
-		return r.TryPeel(ref.Target)
+	if ref.Target.IsReference() {
+		return r.Peel(ref)
 	}
 
-	return ref.Target
+	return plumbing.ToHash(ref.Target.String())
 }
 
-// func (r *Repository) GetBranch(name string) (*plumbing.Reference, error) {
-// 	return r.GetReference("refs/heads/" + name)
-// }
+func (r *Repository) GetBranch(name string) (*plumbing.Reference, error) {
+	return r.GetReference("refs/heads/" + name)
+}
 
-// func (r *Repository) GetRemoteBranch(branchName string, remoteName string) (*plumbing.Reference, error) {
-// 	return r.GetReference("refs/remotes/" + remoteName + "/heads" + branchName)
-// }
+func (r *Repository) GetRemoteBranch(branchName string, remoteName string) (*plumbing.Reference, error) {
+	return r.GetReference("refs/remotes/" + remoteName + "/heads" + branchName)
+}
 
-// func (r *Repository) GetRemoteTag(tagName string, remoteName string) (*plumbing.Reference, error) {
-// 	return r.GetReference("refs/remotes/" + remoteName + "/tags" + tagName)
-// }
-
-// symbolic reference which reference to another reference
-// func (r *Repository) GetHead() (*plumbing.Reference, error) {
-// 	file, err := os.Open(filepath.Join(r.path, "HEAD"))
-// 	if err != nil {
-// 		return nil, goeErrors.ErrReferenceNoteFound
-// 	}
-// 	reader := bufio.NewReader(file)
-// 	line, _, _ := reader.ReadLine()
-// 	refNameBytes := bytes.SplitN(line, []byte{' '}, 2)[1]
-// 	refNameBytes = bytes.TrimSpace(refNameBytes)
-
-// 	return r.GetReference(string(refNameBytes))
-// }
-
-// func (r *Repository) GetReferences() ([]plumbing.ReferenceName, error) {
-// 	references := make([]plumbing.Reference, 0)
-// 	// Try packed-refs first
-// 	file, err := os.Open(filepath.Join(r.path, "packed-refs"))
-// 	defer file.Close()
-// 	if err == nil {
-// 		scanner := bufio.NewScanner(file)
-// 		for scanner.Scan() {
-// 			lineBytes := scanner.Bytes()
-
-// 			// Ignore comments and annotated tag
-// 			if lineBytes[0] == '#' || lineBytes[0] == '^' {
-// 				continue
-// 			}
-
-// 			chunks := bytes.SplitN(lineBytes, []byte{' '}, 2)
-// 			references = append(references, *plumbing.NewReference(string(chunks[1]), plumbing.ToHash(string(chunks[0]))))
-// 		}
-// 		return references, nil
-// 	}
-
-// 	// TODO: scan other remotes and tags folder
-// 	// read individual ref files
-// 	folder, err := os.Open(filepath.Join(r.path + "heads"))
-// 	defer folder.Close()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	infos, err := folder.Readdir(0)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	for _, f := range infos {
-// 		if f.IsDir() {
-// 			continue
-// 		}
-
-// 		refName := "refs/heads/" + f.Name()
-// 		lineBytes, err := os.ReadFile(filepath.Join(r.path, refName))
-// 		if err != nil {
-// 			continue
-// 		}
-
-// 		references = append(references, *plumbing.NewReference(refName, plumbing.ToHash(string(lineBytes))))
-// 	}
-
-// 	// individual tag file
-// 	folder, err = os.Open(filepath.Join(r.path + "tags"))
-// 	defer folder.Close()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	infos, err = folder.Readdir(0)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	for _, f := range infos {
-// 		if f.IsDir() {
-// 			continue
-// 		}
-
-// 		refName := "refs/tags/" + f.Name()
-// 		lineBytes, err := os.ReadFile(filepath.Join(r.path, refName))
-// 		if err != nil {
-// 			continue
-// 		}
-
-// 		references = append(references, *plumbing.NewReference(refName, plumbing.ToHash(string(lineBytes))))
-// 	}
-
-// 	return references, nil
-// }
+func (r *Repository) GetRemoteTag(tagName string, remoteName string) (*plumbing.Reference, error) {
+	return r.GetReference("refs/remotes/" + remoteName + "/tags" + tagName)
+}
 
 func (r *Repository) GetReference(refname string) (*plumbing.Reference, error) {
 	// Try packed-refs first
@@ -406,18 +314,7 @@ func (r *Repository) GetReference(refname string) (*plumbing.Reference, error) {
 	// then refs folder
 	lineBytes, err := ioutil.ReadFile(filepath.Join(r.path, string(refname)))
 	if err != nil {
-		return nil, goeErrors.ErrReferenceNoteFound
+		return nil, errors.ErrReferenceNoteFound
 	}
 	return plumbing.NewReference(refname, lineBytes), nil
 }
-
-// func (r *Repository) tryPeel(data []byte) (plumbing.Hash, error) {
-// 	if plumbing.IsReferenceName(string(data)) {
-// 		return plumbing.NewHash(data), nil
-// 	}
-
-// 	ref := plumbing.ReferenceName(data)
-// 	ref = ref.GetSymbolicRefName()
-
-// 	return r.GetReferenceTarget(ref)
-// }

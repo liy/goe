@@ -9,18 +9,18 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/liy/goe/fixtures"
 	"github.com/liy/goe/plumbing/indexfile"
+	"github.com/liy/goe/tests"
 	"github.com/liy/goe/utils"
 )
 
 func main() {
 	var wg sync.WaitGroup
 	fmt.Println("Downloading fixtures...")
-	fs := fixtures.GetRepositoryFixtures()
+	fs := tests.GetFixtures()
 	for _, f := range fs {
 		wg.Add(1)
-		go func(f fixtures.RepositoryFixture) {
+		go func(f tests.RepositoryFixture) {
 			defer wg.Done()
 			download(f)
 		}(f)
@@ -30,7 +30,7 @@ func main() {
 	SnapshotIndexFile()
 }
 
-func download(fixture fixtures.RepositoryFixture) {
+func download(fixture tests.RepositoryFixture) {
 	defer fmt.Printf("%v downloaded\n", fixture.Name)
 
 	var containerFolder = "./repos/"
@@ -59,7 +59,7 @@ func download(fixture fixtures.RepositoryFixture) {
 }
 
 func SnapshotIndexFile() {
-	fixture := fixtures.NewRepositoryFixture("topo-sort")
+	fixture := tests.GetFixture("topo-sort")
 	file := fixture.IndexFile("./repos")
 	idx, _ := indexfile.Decode(file)
 
