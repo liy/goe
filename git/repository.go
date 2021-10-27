@@ -4,9 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"io/ioutil"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/liy/goe/errors"
 	"github.com/liy/goe/fs"
@@ -29,7 +27,8 @@ func OpenRepository(path string) (repo *Repository, err error) {
 	}
 
 	var readers []packfile.PackReader = make([]packfile.PackReader, len(packFiles))
-	for i, packName := range packFiles {
+	for i, p := range packFiles {
+		packName := filepath.Base(p)
 		pack, err := dotgit.Pack(packName)
 		if err != nil {
 			return nil, err
@@ -169,53 +168,57 @@ func (r *Repository) GetPath() string {
 	return r.dotgit.Root()
 }
 
-func (r *Repository) traverseRefs(relativePaths []string, references *[]*plumbing.Reference, packed *map[string]bool) error {
-	fullPath := append([]string{r.dotgit.Root()}, relativePaths...)
-	ab := filepath.Join(fullPath...)
-	folder, err := os.Open(ab)
-	if err != nil {
-		return err
-	}
-	defer folder.Close()
+// func (r *Repository) traverseRefs(relativePaths []string, references *[]*plumbing.Reference, packed *map[string]bool) error {
+// 	fullPath := append([]string{r.dotgit.Root()}, relativePaths...)
+// 	ab := filepath.Join(fullPath...)
+// 	folder, err := os.Open(ab)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer folder.Close()
 
-	infos, err := folder.ReadDir(0)
-	if err != nil {
-		return err
-	}
+// 	infos, err := folder.ReadDir(0)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	for _, f := range infos {
-		fp := append(relativePaths, f.Name())
-		if f.IsDir() {
-			err = r.traverseRefs(fp, references, packed)
-			if err != nil {
-				return err
-			}
-		} else {
-			refname := strings.Join(fp, "/")
+// 	for _, f := range infos {
+// 		fp := append(relativePaths, f.Name())
+// 		if f.IsDir() {
+// 			err = r.traverseRefs(fp, references, packed)
+// 			if err != nil {
+// 				return err
+// 			}
+// 		} else {
+// 			refname := strings.Join(fp, "/")
 
-			// Ignore already packed references
-			if (*packed)[refname] {
-				continue
-			}
+// 			// Ignore already packed references
+// 			if (*packed)[refname] {
+// 				continue
+// 			}
 
-			data, err := ioutil.ReadFile(filepath.Join(r.dotgit.Root(), refname))
-			if err != nil {
-				return err
-			}
+// 			file, err := r.dotgit.Reference(refname)
+// 			if err != nil {
+// 				return err
+// 			}
+// 			data, err := ioutil.ReadAll(file)
+// 			if err != nil {
+// 				return err
+// 			}
 
-			*references = append(*references, plumbing.NewReference(refname, bytes.TrimSpace(data)))
-		}
-	}
+// 			*references = append(*references, plumbing.NewReference(refname, bytes.TrimSpace(data)))
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func (r *Repository) GetReferences() []*plumbing.Reference {
 	refs := make([]*plumbing.Reference, 0)
 
 	// record all packed references
-	packed := make(map[string]bool, 0)
-	file, err := os.Open(filepath.Join(r.dotgit.Root(), "packed-refs"))
+	packed := make(map[string]bool)
+	file, err := r.dotgit.PackedReference()
 	if err == nil {
 		defer file.Close()
 
@@ -234,11 +237,16 @@ func (r *Repository) GetReferences() []*plumbing.Reference {
 		}
 	}
 
-	// Traverse to find all loose references
-	folder := []string{
-		"refs",
+	// Find all loose references
+	names := r.dotgit.ReferenceNames()
+	for _, n := range names {
+		if packed[n] {
+			continue
+		}
+		file, _ := r.dotgit.Reference(n)
+		data, _ := ioutil.ReadAll(file)
+		refs = append(refs, plumbing.NewReference(n, bytes.TrimSpace(data)))
 	}
-	r.traverseRefs(folder, &refs, &packed)
 
 	// Head
 	ref, err := r.HEAD()
@@ -251,9 +259,14 @@ func (r *Repository) GetReferences() []*plumbing.Reference {
 
 // symbolic reference which reference to another reference
 func (r *Repository) HEAD() (*plumbing.Reference, error) {
-	data, err := ioutil.ReadFile(filepath.Join(r.dotgit.Root(), "HEAD"))
+	file, err := r.dotgit.Open("HEAD")
 	if err != nil {
-		return nil, errors.ErrReferenceNoteFound
+		return nil, errors.ErrReferenceNotFound
+	}
+	
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, errors.ErrReferenceNotFound
 	}
 
 	return plumbing.NewReference("HEAD", bytes.TrimSpace(data)), nil
@@ -286,13 +299,9 @@ func (r *Repository) GetRemoteBranch(branchName string, remoteName string) (*plu
 	return r.GetReference("refs/remotes/" + remoteName + "/heads" + branchName)
 }
 
-func (r *Repository) GetRemoteTag(tagName string, remoteName string) (*plumbing.Reference, error) {
-	return r.GetReference("refs/remotes/" + remoteName + "/tags" + tagName)
-}
-
 func (r *Repository) GetReference(refname string) (*plumbing.Reference, error) {
 	// Try packed-refs first
-	file, err := os.Open(filepath.Join(r.dotgit.Root(), "packed-refs"))
+	file, err := r.dotgit.PackedReference()
 	if err == nil {
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
@@ -313,9 +322,13 @@ func (r *Repository) GetReference(refname string) (*plumbing.Reference, error) {
 	}
 
 	// then refs folder
-	lineBytes, err := ioutil.ReadFile(filepath.Join(r.dotgit.Root(), string(refname)))
+	file, err = r.dotgit.Reference(refname)
 	if err != nil {
-		return nil, errors.ErrReferenceNoteFound
+		return nil, errors.ErrReferenceNotFound
+	}
+	lineBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, errors.ErrReferenceNotFound
 	}
 	return plumbing.NewReference(refname, lineBytes), nil
 }

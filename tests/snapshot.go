@@ -21,7 +21,7 @@ func getType(o interface{}) (res string) {
 }
 
 func ToMatchSnapshot(t *testing.T, o interface{}) {
-	expectedBytes, err := json.Marshal(o)
+	actualBytes, err := json.Marshal(o)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func ToMatchSnapshot(t *testing.T, o interface{}) {
 	}
 	p := "./" + testFuncName + postfix
 	if _, err := os.Stat(p); os.IsNotExist(err) {
-		err = os.WriteFile(p, expectedBytes, 0644)
+		err = os.WriteFile(p, actualBytes, 0644)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -52,6 +52,6 @@ func ToMatchSnapshot(t *testing.T, o interface{}) {
 			t.Fatal(err)
 		}
 
-		require.JSONEq(t, string(expectedBytes), string(bs))
+		require.JSONEq(t, string(bs), string(actualBytes))
 	}
 }
