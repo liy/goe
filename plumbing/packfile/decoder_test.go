@@ -3,7 +3,6 @@ package packfile
 import (
 	"testing"
 
-	"github.com/liy/goe/plumbing/indexfile"
 	"github.com/liy/goe/tests"
 )
 
@@ -12,8 +11,7 @@ func TestDecode(t *testing.T) {
 	idxFile := fixture.IndexFile("../../repos")
 	packFile := fixture.PackFile("../../repos")
 	
-	idx, _ := indexfile.Decode(idxFile)
-	pack, err := Decode(packFile, idx)
+	pack, err := Decode(packFile, idxFile)
 	if err != nil {
 		t.Fatal(err)
 	}

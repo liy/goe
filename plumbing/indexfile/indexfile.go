@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"os"
 
 	"github.com/liy/goe/plumbing"
 )
@@ -25,15 +24,9 @@ type Index struct {
 	ReverseHash map[uint64]uint32
 }
 
-func NewIndex(path string) *Index{
-	// bytes, _ := ioutil.ReadFile(path)
-	file, _ := os.Open(path)
-	idx, _ := Decode(bufio.NewReader(file))
-	return idx
-}
-
-func NewIndex2(reader io.Reader) *Index {
+func NewIndex(reader io.Reader) *Index {
 	idx, _ := Decode(bufio.NewReader(reader))
+	// defer reader.Close()
 	return idx
 }
  

@@ -3,14 +3,12 @@ package packfile
 import (
 	"encoding/binary"
 	"io"
-	"os"
 
 	"github.com/liy/goe/plumbing"
-	"github.com/liy/goe/plumbing/indexfile"
 )
 
-func Decode(file *os.File, idx *indexfile.Index) (*Pack, error) {
-	packReader := NewPackReaderFromFile(file, idx)
+func Decode(file io.ReadSeeker, idx io.Reader) (*Pack, error) {
+	packReader := NewPackReader(file, idx)
 	pack := new(Pack)
 	
 	signature := make([]byte, 4)
@@ -25,12 +23,12 @@ func Decode(file *os.File, idx *indexfile.Index) (*Pack, error) {
 		return nil, err
 	}
 
-	pack.NumObjects = idx.NumObjects
+	pack.NumObjects = packReader.Index.NumObjects
 	pack.Objects = make([]*plumbing.RawObject, pack.NumObjects)
 
-	for i := 0; i < int(idx.NumObjects); i++ {
-		offset := idx.GetOffsetAt(i)
-		hashBytes := idx.GetHash(i)
+	for i := 0; i < int(packReader.Index.NumObjects); i++ {
+		offset := packReader.Index.GetOffsetAt(i)
+		hashBytes := packReader.Index.GetHash(i)
 		raw := plumbing.NewRawObject(plumbing.NewHash(hashBytes))
 		packReader.readObjectAt(offset, raw)
 		pack.Objects[i] = raw

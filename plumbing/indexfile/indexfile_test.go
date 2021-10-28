@@ -12,9 +12,10 @@ import (
 var idx *Index
 
 func init() {
+	dotgit := tests.NewEmbededDotGit()
 	fixture := tests.GetFixture("topo-sort")
-	filePath := fixture.GetIndexFilePath("../../repos")
-	idx = NewIndex(filePath)
+	reader, _ := dotgit.PackIndex("pack-"+fixture.PackfileHash + ".idx")
+	idx = NewIndex(reader)
 }
 
 func TestGetOffset(t *testing.T) {

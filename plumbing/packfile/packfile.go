@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/liy/goe/errors"
 	"github.com/liy/goe/plumbing"
@@ -29,30 +28,11 @@ type PackReader struct {
 	offset    int64
 }
 
-func NewPackReader(packPath string) *PackReader {
-	file, _ := os.Open(packPath)
+func NewPackReader(packReader io.ReadSeeker, idxReader io.Reader) *PackReader {
 	return &PackReader{
-		Index:     indexfile.NewIndex(packPath[:len(packPath)-4] + "idx"),
-		file:      file,
-		bufReader: bufio.NewReader(file),
-		cache:     utils.NewLRU(int64(5 * 1024 * 1024)),
-	}
-}
-
-func NewPackReader2(pack io.ReadSeeker, idx io.Reader) *PackReader {
-	return &PackReader{
-		Index:     indexfile.NewIndex2(idx),
-		file:      pack,
-		bufReader: bufio.NewReader(pack),
-		cache:     utils.NewLRU(int64(5 * 1024 * 1024)),
-	}
-}
-
-func NewPackReaderFromFile(file *os.File, idx *indexfile.Index) *PackReader {
-	return &PackReader{
-		Index:     idx,
-		file:      file,
-		bufReader: bufio.NewReader(file),
+		Index:     indexfile.NewIndex(idxReader),
+		file:      packReader,
+		bufReader: bufio.NewReader(packReader),
 		cache:     utils.NewLRU(int64(5 * 1024 * 1024)),
 	}
 }

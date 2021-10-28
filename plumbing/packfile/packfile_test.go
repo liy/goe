@@ -13,8 +13,11 @@ import (
 var packReader *PackReader
 
 func init() {
+	dotgit := tests.NewEmbededDotGit()
 	fixture := tests.GetFixture("topo-sort")
-	packReader = NewPackReader(fixture.GetPackFilePath("../../repos"))
+	idx, _ := dotgit.PackIndex("pack-"+fixture.PackfileHash + ".idx")
+	pack, _ := dotgit.Pack("pack-"+fixture.PackfileHash + ".pack")
+	packReader = NewPackReader(pack, idx)
 }
 
 func TestReadObject(t *testing.T) {

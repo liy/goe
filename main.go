@@ -150,7 +150,7 @@ func main() {
 	// s.Serve(listener)
 
 	// testRepository()
-	mine()
+	// mine()
 	// processed()
 	// defer profile.Start().Stop()
 
@@ -170,4 +170,11 @@ func main() {
 	
 	// idx, _ := indexfile.Decode(idxFile)
 	// packfile.Decode(packFile, idx)
+
+	// ff := tests.FS(false)
+	// f, e := ff.Open("/topo-sort/.git/objects/pack")
+	// fmt.Println(f,e )
+	// fi, e := f.Readdir(2)
+	// fmt.Println(fi, e)
+
 }
