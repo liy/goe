@@ -7,44 +7,46 @@ import (
 
 	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/tests"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-var packReader *PackReader
-
-func init() {
-	dotgit := tests.NewEmbededDotGit()
-	fixture := tests.GetFixture("topo-sort")
-	idx, _ := dotgit.PackIndex("pack-"+fixture.PackfileHash + ".idx")
-	pack, _ := dotgit.Pack("pack-"+fixture.PackfileHash + ".pack")
-	packReader = NewPackReader(pack, idx)
+type PackFileSuite struct {
+	suite.Suite
+	packReader *PackReader
 }
 
-func TestReadObject(t *testing.T) {
-	assert := assert.New(t)
+func (suite *PackFileSuite) SetupTest() {
+	fixture := tests.NewEmbeded(suite.T())
+	suite.packReader = NewPackReader(fixture.Pack(), fixture.PackIndex())
+}
+
+func (suite *PackFileSuite) TestReadObject() {
 	hash := "b39f0caec88b946e189d37a0a803e3d14d1399a4"
-	raw, err := packReader.ReadObject(plumbing.ToHash(hash))
+	raw, err := suite.packReader.ReadObject(plumbing.ToHash(hash))
 	if err != nil {
-		t.Fatal(err)
+		suite.T().Fatal(err)
 	}
 
 	expectedContent := "tree 7637310b6bd9226d5425a0f1585b22b69050eadb\nparent 4d507ff6044d78b6809f240333bae341f508f06b\nauthor liy <liy8272@gmail.com> 1413661783 +0100\ncommitter liy <liy8272@gmail.com> 1413661783 +0100\n\nUpdate ignore and package info\n"
 
-	assert.Equal("b39f0caec88b946e189d37a0a803e3d14d1399a4", raw.Hash().String(), "object hash is correct")
-	assert.Equal(plumbing.OBJ_COMMIT, raw.Type, "object is commit type")
-	assert.Equal(225, int(raw.DeflatedSize), "object has correct defalated size")
-	assert.Equal(expectedContent, string(raw.Data), "object has correct content")
+	suite.Equal("b39f0caec88b946e189d37a0a803e3d14d1399a4", raw.Hash().String(), "object hash is correct")
+	suite.Equal(plumbing.OBJ_COMMIT, raw.Type, "object is commit type")
+	suite.Equal(225, int(raw.DeflatedSize), "object has correct defalated size")
+	suite.Equal(expectedContent, string(raw.Data), "object has correct content")
 }
 
-func TestPackReader(t *testing.T) {
+func (suite *PackFileSuite) TestPackReader() {
 	pack := new(Pack)
-	assert := assert.New(t)
 	// Skip signature
-	packReader.Seek(4, io.SeekStart)
+	suite.packReader.Seek(4, io.SeekStart)
 	// Version
 	data := make([]byte, 4)
-	packReader.Read(data)
+	suite.packReader.Read(data)
 	pack.Version = int32(binary.BigEndian.Uint32(data))
 
-	assert.Equal(2, int(pack.Version), "Only support version 2")
+	suite.Equal(2, int(pack.Version), "Only support version 2")
+}
+
+func TestSuite(t *testing.T) {
+    suite.Run(t, new(PackFileSuite))
 }

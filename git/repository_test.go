@@ -5,79 +5,86 @@ import (
 
 	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/tests"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-var repo *Repository
-
-func init() {
-	var err error
-	repo, err = OpenRepository("../repos/topo-sort")
-	if err != nil {
-		panic(err)
-	}
+type Suite struct {
+	suite.Suite
+	repo *Repository
 }
 
-func TestHead(t *testing.T) {
-	ref, err := repo.HEAD()
+func (suite *Suite) SetupTest() {
+	repo, err := Open("/topo-sort/", tests.Embeded{})
 	if err != nil {
-		t.Fatal(err)
+		suite.T().Fatal(err)
 	}
-
-	assert.Equal(t, "refs/heads/dev", ref.Target.ReferenceName(), "HEAD is pointed to dev branch")
+	suite.repo = repo
 }
 
-func TestTryPeel(t *testing.T) {
-	ref, err := repo.HEAD()
+func (suite *Suite) TestHead() {
+	ref, err := suite.repo.HEAD()
 	if err != nil {
-		t.Fatal(err)
+		suite.T().Fatal(err)
 	}
 
-	hash := repo.Peel(ref)
-	assert.Equal(t, "f2010ee942a47bec0ca7e8f04240968ea5200735", hash.String(), "HEAD pointed to dev branch tip commit")
+	suite.Equal("refs/heads/dev", ref.Target.ReferenceName(), "HEAD is pointed to dev branch")
 }
 
-func TestGetReferences(t *testing.T) {
-	refs := repo.GetReferences()
+func (suite *Suite) TestTryPeel() {
+	ref, err := suite.repo.HEAD()
+	if err != nil {
+		suite.T().Fatal(err)
+	}
+
+	hash := suite.repo.Peel(ref)
+	suite.Equal("f2010ee942a47bec0ca7e8f04240968ea5200735", hash.String(), "HEAD pointed to dev branch tip commit")
+}
+
+func (suite *Suite) TestGetReferences() {
+	refs := suite.repo.GetReferences()
 	
-	tests.ToMatchSnapshot(t, refs)
+	tests.ToMatchSnapshot(suite.T(), refs)
 }
 
-func TestGetCommit(t *testing.T) {
-	c, err := repo.GetCommit(plumbing.ToHash("4854f1ce5137086767e71b4d3010db28bcd09c49"))
+func (suite *Suite) TestGetCommit() {
+	c, err := suite.repo.GetCommit(plumbing.ToHash("4854f1ce5137086767e71b4d3010db28bcd09c49"))
 	if err != nil {
-		t.Fatal(err)
+		suite.T().Fatal(err)
 	}
 
-	assert.True(t, len(c.Parents) == 1, "only has 1 parent")
-	assert.Equal(t, "c53c4c18e245d880899405c07eb4d01b735b72ad", c.Parents[0].String(), "has correct parent commit")
-	assert.Equal(t, "Fix package keywords.\n", c.Message, "commit has correct message")
-	tests.ToMatchSnapshot(t, c)
+	suite.True(len(c.Parents) == 1, "only has 1 parent")
+	suite.Equal("c53c4c18e245d880899405c07eb4d01b735b72ad", c.Parents[0].String(), "has correct parent commit")
+	suite.Equal("Fix package keywords.\n", c.Message, "commit has correct message")
+	tests.ToMatchSnapshot(suite.T(), c)
 }
 
-func TestGetCommits(t *testing.T) {
-	cs, err := repo.GetCommits(plumbing.ToHash("c91773cc3da3c2c3c954626a0b6a44c3ac9e3e92"))
+func (suite *Suite) TestGetCommits() {
+	cs, err := suite.repo.GetCommits(plumbing.ToHash("c91773cc3da3c2c3c954626a0b6a44c3ac9e3e92"))
 	if err != nil {
-		t.Fatal(err)
+		suite.T().Fatal(err)
 	}
 	
-	tests.ToMatchSnapshot(t, cs)
+	tests.ToMatchSnapshot(suite.T(), cs)
 }
 
-func TestGetAnnotatedTag(t *testing.T) {
-	tag, err := repo.GetAnnotatedTag(plumbing.ToHash("ca0a44b6eddd79547d1ad8bc94be987489edde2a"))
+func (suite *Suite) TestGetAnnotatedTag() {
+	tag, err := suite.repo.GetAnnotatedTag(plumbing.ToHash("ca0a44b6eddd79547d1ad8bc94be987489edde2a"))
 	if err != nil {
-		t.Fatal(err)
+		suite.T().Fatal(err)
 	}
 
-	tests.ToMatchSnapshot(t, tag)
+	tests.ToMatchSnapshot(suite.T(), tag)
 }
 
-func TestReadObject(t *testing.T) {
-	obj, err := repo.ReadObject(plumbing.ToHash("4854f1ce5137086767e71b4d3010db28bcd09c49"))
+func (suite *Suite) TestReadObject() {
+	obj, err := suite.repo.ReadObject(plumbing.ToHash("4854f1ce5137086767e71b4d3010db28bcd09c49"))
 	if err != nil {
-		t.Fatal(err)
+		suite.T().Fatal(err)
 	}
 
-	tests.ToMatchSnapshot(t, obj)
+	tests.ToMatchSnapshot(suite.T(), obj)
+}
+
+func TestSuite(t *testing.T) {
+    suite.Run(t, new(Suite))
 }

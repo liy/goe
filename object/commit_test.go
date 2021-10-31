@@ -9,7 +9,14 @@ import (
 
 func TestDecodeCommit(t *testing.T) {
 	hash := "f2010ee942a47bec0ca7e8f04240968ea5200735"
-	commit, err := DecodeCommit(plumbing.GetRawObject(t, hash))
+	file := tests.NewEmbeded(t).GetObjectFile(hash)
+	raw := plumbing.NewRawObject(plumbing.ToHash(hash))
+	err := raw.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commit, err := DecodeCommit(raw)
 	if err != nil {
 		t.Fatal(err)
 	}

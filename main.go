@@ -21,7 +21,7 @@ import (
 func mine() {
 	start := time.Now()
 
-	r, err := git.OpenRepository("./repos/rails")
+	r, err := git.SimpleOpen("./repos/rails")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -176,5 +176,5 @@ func main() {
 	// fmt.Println(f,e )
 	// fi, e := f.Readdir(2)
 	// fmt.Println(fi, e)
-
+	mine()
 }

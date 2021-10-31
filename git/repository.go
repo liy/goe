@@ -3,55 +3,48 @@ package git
 import (
 	"bufio"
 	"bytes"
-	"path/filepath"
+	"io"
+	"net/http"
+	"path"
 	"regexp"
 
 	"github.com/liy/goe/errors"
-	"github.com/liy/goe/fs"
 	"github.com/liy/goe/object"
 	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/plumbing/packfile"
+	"github.com/liy/goe/store"
 )
 
 var isDotGit, _ = regexp.Compile(".git/?$")
 
 type Repository struct {
 	path string
-	dotgit		fs.FileSystem
+	dotgit		*store.DotGit
 	packReaders []packfile.PackReader
 }
 
-func OpenRepository(path string) (repo *Repository, err error) {
-	if !isDotGit.MatchString(path) {
-		path = filepath.Join(path, ".git")
+func Open(p string, fs http.FileSystem) (repo *Repository, err error) {
+	if !isDotGit.MatchString(p) {
+		p = path.Join(p, ".git")
 	}
-	dotgit := fs.NewDotGit(path)
+	dotgit := store.NewDotGit(p, fs)
 
-	packs, err := dotgit.Packs()
-	if err != nil {
-		return nil, err
-	}
 
-	var readers []packfile.PackReader = make([]packfile.PackReader, len(packs))
-	for i, p := range packs {
-		packName := filepath.Base(p)
-		pack, err := dotgit.Pack(packName)
-		if err != nil {
-			return nil, err
-		}
-		idx, err := dotgit.PackIndex(packName[:len(packName)-4] + "idx")
-		if err != nil {
-			return nil, err
-		}
-
-		readers[i] = *packfile.NewPackReader(pack, idx)
-	}
-
+	var readers []packfile.PackReader = make([]packfile.PackReader, 0)
+	dotgit.Packs(func(pack http.File, idx http.File) {
+		r := packfile.NewPackReader(pack, idx)
+		readers = append(readers, *r)
+	})
+	
 	return &Repository{
-		path,
+		p,
 		dotgit,
 		readers,
 	}, nil
+}
+
+func SimpleOpen(path string) (repo *Repository, err error) {
+	return Open(path, store.Simple{})
 }
 
 func (r *Repository) ReadObjectFile(hash plumbing.Hash) (*plumbing.RawObject, error) {
@@ -206,7 +199,7 @@ func (r *Repository) GetReferences() []*plumbing.Reference {
 			continue
 		}
 		file, _ := r.dotgit.Reference(n)
-		data, _ := r.dotgit.ReadAll(file)
+		data, _ := io.ReadAll(file)
 		refs = append(refs, plumbing.NewReference(n, bytes.TrimSpace(data)))
 	}
 
@@ -226,7 +219,7 @@ func (r *Repository) HEAD() (*plumbing.Reference, error) {
 		return nil, errors.ErrReferenceNotFound
 	}
 	
-	data, err := r.dotgit.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return nil, errors.ErrReferenceNotFound
 	}
@@ -288,7 +281,7 @@ func (r *Repository) GetReference(refname string) (*plumbing.Reference, error) {
 	if err != nil {
 		return nil, errors.ErrReferenceNotFound
 	}
-	lineBytes, err := r.dotgit.ReadAll(file)
+	lineBytes, err := io.ReadAll(file)
 	if err != nil {
 		return nil, errors.ErrReferenceNotFound
 	}

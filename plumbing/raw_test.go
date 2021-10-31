@@ -44,6 +44,11 @@ func TestRawObjectWrite(t *testing.T) {
 }
 
 func TestReadFile(t *testing.T) {
-	raw := GetRawObject(t, "f2010ee942a47bec0ca7e8f04240968ea5200735")
+	hash := "f2010ee942a47bec0ca7e8f04240968ea5200735"
+	fixture := tests.NewEmbeded(t)
+	file := fixture.GetObjectFile(hash)
+	raw := NewRawObject(ToHash(hash))
+	raw.ReadFile(file)
+	
 	tests.ToMatchSnapshot(t, raw)
 }

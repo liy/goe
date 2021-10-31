@@ -7,9 +7,8 @@ import (
 )
 
 func TestDecoder(t *testing.T) {
-	fixture := tests.GetFixture("topo-sort")
-	file := fixture.IndexFile("../../repos")
-	idx, err := Decode(file)
+	fixture := tests.NewEmbeded(t)
+	idx, err := Decode(fixture.PackIndex())
 	if err != nil {
 		t.Fatal(err)
 	}

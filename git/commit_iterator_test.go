@@ -10,7 +10,7 @@ import (
 )
 
 func TestCommitIterator(t *testing.T) {
-	repo, err := OpenRepository("../repos/topo-sort")
+	repo, err := Open("/topo-sort", tests.Embeded{})
 	if err != nil {
 		t.Fatal(err)
 	}
