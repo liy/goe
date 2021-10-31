@@ -21,7 +21,7 @@ import (
 func mine() {
 	start := time.Now()
 
-	r, err := git.SimpleOpen("./repos/rails")
+	r, err := git.SimpleOpen("./repos/topo-sort")
 	if err != nil {
 		fmt.Println(err)
 	}

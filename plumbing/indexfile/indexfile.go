@@ -88,5 +88,4 @@ func (idx *Index) GetOffset(hash plumbing.Hash) (int64, bool) {
 			low = mid + 1
 		}
 	}
-	
 }

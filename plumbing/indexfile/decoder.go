@@ -6,10 +6,8 @@ import (
 	"io"
 )
 
-// func Decode(indexBytes []byte) (*Index, error) {
 func Decode(reader io.Reader) (*Index, error) {
 	idx := new(Index)
-	// reader := bytes.NewReader(indexBytes)
 
 	// Check magic header
 	magicBytes := make([]byte, 4)

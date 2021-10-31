@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/liy/goe/plumbing"
+	"github.com/liy/goe/store"
 	"github.com/liy/goe/tests"
 	"github.com/stretchr/testify/suite"
 )
@@ -49,4 +50,32 @@ func (suite *Suite) TestGetHash() {
 
 func TestSuite(t *testing.T) {
     suite.Run(t, new(Suite))
+}
+
+var idx *Index
+func init() {
+	dotgit := store.NewDotGit("/topo-sort/.git", tests.Embeded{})
+	file, _:= dotgit.PackIndex("6179faab20f2d649a12fd52aab3c8d6e32b27dcd")
+	idx = NewIndex(file)
+}
+
+func BenchmarkGetOffset(b *testing.B) {
+	hash := plumbing.ToHash("0a2d236a6eb889bc433e712bab3e3a9b8889e988")
+	for n := 0; n < b.N; n++ {
+		idx.GetOffset(hash)
+	}
+}
+
+func BenchmarkGetHashFromOffset(b *testing.B) {
+	offset := 1481
+	for n := 0; n < b.N; n++ {
+		idx.GetHashFromOffset(uint64(offset))
+	}
+}
+
+func BenchmarkGetHash(b *testing.B) {
+	position := 1
+	for n := 0; n < b.N; n++ {
+		idx.GetHash(position)
+	}
 }

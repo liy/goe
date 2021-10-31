@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"io"
+	"path"
 	"testing"
 
+	"github.com/liy/goe/store"
 	"github.com/liy/goe/tests"
 	"github.com/stretchr/testify/assert"
 )
@@ -51,4 +53,15 @@ func TestReadFile(t *testing.T) {
 	raw.ReadFile(file)
 	
 	tests.ToMatchSnapshot(t, raw)
+}
+
+func BenchmarkReadFile(b *testing.B) {
+	dotgit := store.NewDotGit("/topo-sort/.git", tests.Embeded{})
+	hash := "f2010ee942a47bec0ca7e8f04240968ea5200735"
+	file, _ := dotgit.Open(path.Join("objects", hash[:2], hash[2:]))
+	raw := NewRawObject(ToHash(hash))
+	
+	for n :=0; n <b.N; n++ {
+		raw.ReadFile(file)
+	}
 }
