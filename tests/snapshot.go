@@ -20,6 +20,19 @@ func getType(o interface{}) (res string) {
     return res + t.Name()
 }
 
+func Save(o interface{}, filename string) error {
+	data, err := json.Marshal(o)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(filename, data, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func ToMatchSnapshot(t *testing.T, o interface{}) {
 	actualBytes, err := json.Marshal(o)
 	if err != nil {
@@ -39,14 +52,14 @@ func ToMatchSnapshot(t *testing.T, o interface{}) {
 	} else {
 		postfix = "_" + postfix + "_snapshost.json"
 	}
-	p := "./" + testFuncName + postfix
-	if _, err := os.Stat(p); os.IsNotExist(err) {
-		err = os.WriteFile(p, actualBytes, 0644)
+	filename := "./" + testFuncName + postfix
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		err := Save(o, filename)
 		if err != nil {
 			t.Fatal(err)
 		}
 	} else {
-		f, _ := os.Open(p)
+		f, _ := os.Open(filename)
 		bs, err := ioutil.ReadAll(f)
 		if err != nil {
 			t.Fatal(err)

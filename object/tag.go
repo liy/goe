@@ -1,7 +1,6 @@
 package object
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/liy/goe/errors"
 	"github.com/liy/goe/plumbing"
+	"github.com/liy/goe/pool/buffer"
 )
 
 /*
@@ -57,9 +57,9 @@ func DecodeTag(raw *plumbing.RawObject) (*Tag, error) {
 		Hash: raw.Hash(),
 	}
 
-	buf := bufferPool.Get().(*bufio.Reader)
-	buf.Reset(bytes.NewReader(raw.Data))
-	defer bufferPool.Put(buf)
+	buf := buffer.GetBuffer(bytes.NewReader(raw.Data))
+	defer buffer.PutBuffer(buf)
+
 
 	for {
 		line, err := buf.ReadBytes('\n')

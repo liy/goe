@@ -1,4 +1,4 @@
-package packfile
+package zlib
 
 import (
 	"bytes"
@@ -8,12 +8,24 @@ import (
 )
 
 var zlibInitBytes = []byte{0x78, 0x9c, 0x01, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01}
-var zlibReaderPool = sync.Pool{
+var zReaderPool = sync.Pool{
 	New: func() interface{} {
 		r, _ := zlib.NewReader(bytes.NewReader(zlibInitBytes))
 		return r
 	},
 }
+
+func GetReader(reader io.Reader) io.ReadCloser {
+	zReader := zReaderPool.Get().(io.ReadCloser)
+	zReader.(zlib.Resetter).Reset(reader, nil)
+	return zReader
+}
+
+func PutReader(zReader io.ReadCloser) {
+	zReaderPool.Put(zReader)
+	zReader.Close()
+}
+
 
 var zlibBufferPool = sync.Pool{
 	New: func() interface{} {
@@ -23,13 +35,10 @@ var zlibBufferPool = sync.Pool{
 	},
 }
 
-/*
-decompressObjectData deflate the zlib object data
-*/
-func decompressObjectData(dst io.Writer, reader io.Reader) (int64, error) {
-	zReader := zlibReaderPool.Get().(io.ReadCloser)
-	zReader.(zlib.Resetter).Reset(reader, nil)
-	defer zlibReaderPool.Put(zReader)
+func Decompress(dst io.Writer, src io.Reader) (int64, error) {
+	zReader := zReaderPool.Get().(io.ReadCloser)
+	zReader.(zlib.Resetter).Reset(src, nil)
+	defer zReaderPool.Put(zReader)
 	defer zReader.Close()
 
 	buffer := zlibBufferPool.Get().(*[]byte)

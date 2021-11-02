@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"crypto/sha1"
+	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/liy/goe/plumbing"
@@ -87,4 +90,72 @@ func TestGet(t *testing.T) {
 	})
 	ok = cache.Contains(plumbing.ToHash("b91773cc3da3c2c3c954626a0b6a44c3ac9e3e92"))
 	assert.False(t, ok, "get least used item should fail")
+}
+
+func makeHashes(N int, seed int64) []plumbing.Hash {
+	rand.Seed(seed)
+	randomHash := func() plumbing.Hash {
+		sha := sha1.New()
+		sha.Write([]byte(fmt.Sprint(rand.Intn(N))))
+		return plumbing.NewHash(sha.Sum(nil))
+	}
+
+	hashes := make([]plumbing.Hash, N)
+	for i := 0; i < N; i++ {
+		hashes[i] = randomHash()
+	}
+
+	return hashes
+}
+
+func shuffleHashes(hashes []plumbing.Hash) []plumbing.Hash {
+	rand.Shuffle(len(hashes), func(i, j int) {
+		hashes[i], hashes[j] = hashes[j], hashes[i]
+	})
+
+	return hashes
+}
+
+var numHashes = 100000
+var addHashes  = makeHashes(numHashes, 2)
+var getHashes  = shuffleHashes(makeHashes(numHashes, 2))
+var defaultCache *LRU
+func init() {
+	defaultCache = NewLRU(40)
+	for i := 0; i < numHashes; i++ {
+		defaultCache.Add(&ItemMock{
+			addHashes[i],
+			5,
+		})
+	}
+}
+
+func BenchmarkAdd(t *testing.B) {
+	cache := NewLRU(1024 * 4)
+	for n := 0; n < t.N; n++ {
+		cache.Add(&ItemMock{
+			addHashes[n%numHashes],
+			5,
+		})
+	}
+}
+
+func BenchmarkGet(t *testing.B) {
+	for n := 0; n < t.N; n++ {
+		defaultCache.Get(getHashes[n%numHashes])
+	}
+}
+
+func BenchmarkAddGet(t *testing.B) {
+	cache := NewLRU(1024 * 4)
+	for n := 0; n < t.N; n++ {
+		cache.Add(&ItemMock{
+			addHashes[n%numHashes],
+			5,
+		})
+		
+		if n%3 ==0 {
+			cache.Get(getHashes[n%numHashes])
+		}
+	}
 }

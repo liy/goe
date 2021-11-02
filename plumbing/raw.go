@@ -1,14 +1,13 @@
 package plumbing
 
 import (
-	"bufio"
-	"bytes"
-	"compress/zlib"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"strconv"
-	"sync"
+
+	"github.com/liy/goe/pool/buffer"
+	"github.com/liy/goe/pool/zlib"
 )
 
 type ObjectType int8
@@ -137,29 +136,12 @@ func (o *RawObject) Size() int64 {
 	return o.DeflatedSize
 }
 
-var bufferPool = sync.Pool{
-	New: func() interface{} {
-		return bufio.NewReader(nil)
-	},
-}
-
-var zlibInitBytes = []byte{0x78, 0x9c, 0x01, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01}
-var zlibReaderPool = sync.Pool{
-	New: func() interface{} {
-		r, _ := zlib.NewReader(bytes.NewReader(zlibInitBytes))
-		return r
-	},
-}
-
 func (raw *RawObject) ReadFile(reader io.Reader) error {
-	zReader := zlibReaderPool.Get().(io.ReadCloser)
-	zReader.(zlib.Resetter).Reset(reader, nil)
-	defer zlibReaderPool.Put(zReader)
-	defer zReader.Close()
+	zReader := zlib.GetReader(reader)
+	defer zlib.PutReader(zReader)
 
-	buf := bufferPool.Get().(*bufio.Reader)
-	buf.Reset(zReader)
-	defer bufferPool.Put(buf)
+	buf := buffer.GetBuffer(zReader)
+	defer buffer.PutBuffer(buf)
 
 	// type
 	t, err := buf.ReadString(' ')

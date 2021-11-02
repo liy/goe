@@ -9,6 +9,7 @@ import (
 	"github.com/liy/goe/errors"
 	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/plumbing/indexfile"
+	"github.com/liy/goe/pool/zlib"
 	"github.com/liy/goe/utils"
 )
 
@@ -97,7 +98,7 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 		raw.Type = rawBase.Type
 
 		buffer := bytes.NewBuffer(make([]byte, 0))
-		decompressObjectData(buffer, pr)
+		zlib.Decompress(buffer, pr)
 
 		// For error checking only
 		baseSize := utils.ReadVariableSize(buffer)
@@ -139,7 +140,7 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 		raw.Type = rawBase.Type
 
 		buffer := bytes.NewBuffer(make([]byte, 0))
-		decompressObjectData(buffer, pr)
+		zlib.Decompress(buffer, pr)
 
 		// For error checking only
 		baseSize := utils.ReadVariableSize(buffer)
@@ -155,7 +156,7 @@ func (pr *PackReader) readObjectAt(offset int64, raw *plumbing.RawObject) error 
 		}
 	} else {
 		raw.Type = raw.RawType
-		decompressObjectData(raw, pr)
+		zlib.Decompress(raw, pr)
 	}
 
 	return nil
