@@ -130,9 +130,9 @@ func init() {
 	}
 }
 
-func BenchmarkAdd(t *testing.B) {
+func BenchmarkAdd(b *testing.B) {
 	cache := NewLRU(1024 * 4)
-	for n := 0; n < t.N; n++ {
+	for n := 0; n < b.N; n++ {
 		cache.Add(&ItemMock{
 			addHashes[n%numHashes],
 			5,
@@ -140,15 +140,15 @@ func BenchmarkAdd(t *testing.B) {
 	}
 }
 
-func BenchmarkGet(t *testing.B) {
-	for n := 0; n < t.N; n++ {
+func BenchmarkGet(b *testing.B) {
+	for n := 0; n < b.N; n++ {
 		defaultCache.Get(getHashes[n%numHashes])
 	}
 }
 
-func BenchmarkAddGet(t *testing.B) {
+func BenchmarkAddGet(b *testing.B) {
 	cache := NewLRU(1024 * 4)
-	for n := 0; n < t.N; n++ {
+	for n := 0; n < b.N; n++ {
 		cache.Add(&ItemMock{
 			addHashes[n%numHashes],
 			5,

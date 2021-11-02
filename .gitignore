@@ -1,5 +1,3 @@
-repos
-
 src/protobuf
 # certificates
 certificates/*.crt

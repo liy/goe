@@ -35,3 +35,37 @@ func TestReadVariableSize(t *testing.T) {
 	})
 	assert.Equal(t, int64(191), ReadVariableSize(reaader), "Should have correct size value")
 }
+
+func BenchmarkReadVariableSize(b *testing.B) {
+	reaader := bytes.NewReader([]byte {
+		191,
+		234,
+		223,
+		129,
+		128,
+		1,
+	})
+
+	b.Run("ReadVariableSize", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			ReadVariableSize(reaader)
+		}
+	})
+}
+
+func BenchmarkReadVariableOffset(b *testing.B) {
+	reaader := bytes.NewReader([]byte {
+		191,
+		234,
+		223,
+		129,
+		128,
+		1,
+	})
+
+	b.Run("ReadVariableOffset", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			ReadVariableOffset(reaader)
+		}
+	})
+}
