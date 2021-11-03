@@ -46,7 +46,8 @@ func (q *CommitPrioQueue) Enqueue(commit *object.Commit) {
 			break
 		}
 
-		q.swap(child, i)
+		// swap
+		q.queue[child], q.queue[i] = q.queue[i], q.queue[child]
 	}
 }
 
@@ -76,7 +77,8 @@ func (q *CommitPrioQueue) Dequeue() *object.Commit {
 			break
 		}
 
-		q.swap(child, i)
+		// swap
+		q.queue[child], q.queue[i] = q.queue[i], q.queue[child]
 	}
 
 	return result.commit
@@ -90,12 +92,6 @@ func (q *CommitPrioQueue) compare(a int, b int) int {
 	} else {
 		return q.queue[a].enqueueIndex - q.queue[b].enqueueIndex
 	}
-}
-
-func (q *CommitPrioQueue) swap(a int, b int) {
-	t := q.queue[a]
-	q.queue[a] = q.queue[b]
-	q.queue[b] = t
 }
 
 func (q *CommitPrioQueue) Size() int {
