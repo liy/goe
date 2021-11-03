@@ -9,6 +9,7 @@ import (
 	"github.com/liy/goe/git"
 	"github.com/liy/goe/object"
 	"github.com/liy/goe/plumbing"
+
 	"github.com/liy/goe/src/protobuf"
 	ts "google.golang.org/protobuf/types/known/timestamppb"
 
@@ -134,20 +135,7 @@ func main() {
 	// 	log.Println(http.ListenAndServe("localhost:3000", nil))
 	// }()
 
-	// const port = ":8888"
-	// listener, err := net.Listen("tcp", port)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// credentials, err := credentials.NewServerTLSFromFile("./certificates/server.pem", "./certificates/server.key")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-
-	// opts := []grpc.ServerOption{grpc.Creds(credentials), grpc.MaxRecvMsgSize(20 * 1024 * 1024), grpc.MaxSendMsgSize(20 * 1024 * 1024)}
-	// s := grpc.NewServer(opts...)
-	// protobuf.RegisterRepositoryServiceServer(s, new(RepositoryService))
-	// s.Serve(listener)
+	startService()
 
 	// testRepository()
 	// mine()
@@ -176,5 +164,5 @@ func main() {
 	// fmt.Println(f,e )
 	// fi, e := f.Readdir(2)
 	// fmt.Println(fi, e)
-	mine()
+	// mine()
 }

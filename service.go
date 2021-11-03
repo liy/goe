@@ -4,18 +4,36 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"strings"
 	"time"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/liy/goe/git"
+	"github.com/liy/goe/object"
+	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/src/protobuf"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	ts "google.golang.org/protobuf/types/known/timestamppb"
 )
 
-var repository protobuf.Repository
+func startService() {
+	const port = ":8888"
+	listener, err := net.Listen("tcp", port)
+	if err != nil {
+		fmt.Println(err)
+	}
+	credentials, err := credentials.NewServerTLSFromFile("./certificates/server.pem", "./certificates/server.key")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	opts := []grpc.ServerOption{grpc.Creds(credentials), grpc.MaxRecvMsgSize(100 * 1024 * 1024), grpc.MaxSendMsgSize(100 * 1024 * 1024)}
+	s := grpc.NewServer(opts...)
+	protobuf.RegisterRepositoryServiceServer(s, new(RepositoryService))
+	s.Serve(listener)
+}
 
 type RepositoryService struct {}
 
@@ -25,7 +43,7 @@ func (service *RepositoryService) GetHead(ctx context.Context, req *protobuf.Emp
 		return nil, fmt.Errorf("cannot retrieve metadata");
 	}
 
-	path := "./repo"
+	var path = "../repos/topo-sort/"
 	if mdValues := md.Get("path"); len(mdValues) != 0 {
 		path = mdValues[0]
 	}
@@ -33,17 +51,17 @@ func (service *RepositoryService) GetHead(ctx context.Context, req *protobuf.Emp
 	start := time.Now()
 
 	// Opens an already existing repository.
-	r, err := git.PlainOpen(path)
+	r, err := git.SimpleOpen(path)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open repository: %v", path)
 	}
 	
 	// ... retrieves the branch pointed by HEAD
-	ref, err := r.Head()
+	ref, err := r.HEAD()
 	head := protobuf.Head {
-		Hash: ref.Hash().String(),
-		Name: ref.Name().String(),
-		Shorthand: ref.Name().Short(),
+		Hash: r.Peel(ref).String(),
+		Name: ref.Name,
+		Shorthand: ref.Name,
 	}
 	if err != nil {
 		return nil, err
@@ -60,7 +78,7 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 		return nil, fmt.Errorf("cannot retrieve metadata");
 	}
 
-	path := "./repo"
+	var path = "../repos/topo-sort/"
 	if mdValues := md.Get("path"); len(mdValues) != 0 {
 		path = mdValues[0]
 	}
@@ -68,139 +86,112 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 	start := time.Now()
 
 	// Opens an already existing repository.
-	r, err := git.PlainOpen(path)
+	r, err := git.SimpleOpen(path)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open repository: %v", path)
 	}
 	
-	
-	// ... retrieves the branch pointed by HEAD
-	ref, err := r.Head()
-	head := protobuf.Head {
-		Hash: ref.Hash().String(),
-		Name: ref.Name().String(),
-		Shorthand: ref.Name().Short(),
-	}
-	if err != nil {
-		return nil, err
-	}
+	refs := r.GetReferences()
 
-	// ... retrieves the commit history
-	cIter, err := r.Log(&git.LogOptions{All: true})
-	if err != nil {
-		return nil, err
+	// Setup potential tips
+	tips := make([]*object.Commit, len(refs))
+	for i, ref := range refs {
+		var c *object.Commit
+
+		raw, err := r.ReadObject(r.Peel(ref))
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		if raw.Type == plumbing.OBJ_TAG {
+			tag, err := object.DecodeTag(raw)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			raw, err = r.ReadObject(tag.Target)
+			if err != nil {
+				continue
+			}
+		}
+
+		c, err = object.DecodeCommit(raw)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		tips[i] = c
 	}
 
 	var commits []*protobuf.Commit
-	err = cIter.ForEach(func(c *object.Commit) error {
-		messages := strings.Split(c.Message, "\n")
+	cItr := git.NewCommitIterator(r, tips)
+	for {
+		c, err := cItr.Next()
+		if err == git.Done {
+			break
+		}
+		if err != nil {
+			break
+		}
 
-		summary := messages[0]
+		parents := make([]string, len(c.Parents))
+		for i, ph := range c.Parents {
+			parents[i] = ph.String()
+		}
+
+		chunks := strings.Split(c.Message, "\n")
 		body := ""
-		if len(messages) > 1 {
-			body = strings.Join(messages[1:], "\n")
+		if len(chunks) == 2 {
+			body = chunks[1]
 		}
-
-		if(c.Hash.String() == "99bc896d3d914c1607b8ee99b9f2cb51e2fd2b28") {
-			fmt.Println("!!!")
-		}
-
-		parents := make([]string, c.NumParents()) 
-		for i, pc := range c.ParentHashes {
-			parents[i] = pc.String()
-		}
-
-		commit := protobuf.Commit {
-			Hash: c.Hash.String(),
-			Summary: summary,
-			Body: body,
-			Author: &protobuf.Contact {
-				Name: c.Author.Name,
+		commits = append(commits, &protobuf.Commit{
+			Hash:    c.Hash.String(),
+			Summary: chunks[0],
+			Body:    body,
+			Author: &protobuf.Contact{
+				Name:  c.Author.Name,
 				Email: c.Author.Email,
 			},
-			Committer:  &protobuf.Contact {
-				Name: c.Committer.Name,
+			Committer: &protobuf.Contact{
+				Name:  c.Committer.Name,
 				Email: c.Committer.Email,
 			},
-			Parents: parents,
-			CommitTime: ts.New(c.Committer.When),
+			Parents:    parents,
+			CommitTime: ts.New(c.Committer.TimeStamp),
+		})
+	}
+
+	references := make([]*protobuf.Reference, len(refs))
+	for i, rf := range refs {
+		ref := protobuf.Reference{
+			Name:      rf.Name,
+			Shorthand: rf.Name,
+			Hash:      string(rf.Target),
+			IsRemote:  plumbing.IsRemote(rf.Name),
+			IsBranch:  plumbing.IsBranch(rf.Name),
 		}
-		commits = append(commits, &commit)
-
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
+		references[i] = &ref
 	}
 
-	var references []*protobuf.Reference
-	rIter, err := r.References()
-	if err != nil {
-		return nil, err
+	headRef, _ := r.HEAD()
+	head := protobuf.Head{
+		Hash:      r.Peel(headRef).String(),
+		Name:      headRef.Name,
+		Shorthand: headRef.Name,
 	}
 
-	err = rIter.ForEach(func(r *plumbing.Reference) error {
-		ref := protobuf.Reference {
-			Name: r.Name().String(),
-			Shorthand: r.Name().Short(),
-			Hash: r.Hash().String(),
-			Type: protobuf.Reference_Type(r.Type()),
-			IsRemote: r.Target().IsRemote(),
-			IsBranch: r.Target().IsBranch(),
-		}
-		references = append(references, &ref)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	repository = protobuf.Repository {
-		Path: path,
-		Commits: commits,
+	repository := protobuf.Repository{
+		Path:       path,
+		Commits:    commits,
 		References: references,
-		Head: &head,
+		Head:       &head,
 	}
 
+    log.Printf("commits %v", len(commits))
     log.Printf("Log all commits took %s", time.Since(start))
 
 	return &protobuf.GetRepositoryResponse{Repository: &repository}, nil
 }
-
-// func (service *RepositoryService) Watch(req *protobuf.EmptyRequest, stream protobuf.RepositoryService_WatchServer ) error {
-// 	md, ok := metadata.FromIncomingContext(stream.Context()); 
-// 	if !ok {
-// 		return fmt.Errorf("cannot retrieve metadata");
-// 	}
-
-// 	// TODO: when .git folder changes check head
-
-
-// 	path := "./repo"
-// 	if mdValues := md.Get("path"); len(mdValues) != 0 {
-// 		path = mdValues[0]
-// 	}
-
-// 	// Opens an already existing repository.
-// 	r, err := git.PlainOpen(path)
-// 	if err != nil {
-// 		return fmt.Errorf("cannot open repository: %v", path)
-// 	}
-
-// 	// ... retrieves the branch pointed by HEAD
-// 	ref, err := r.Head()
-// 	head := protobuf.Head {
-// 		Hash: ref.Hash().String(),
-// 		Name: ref.Name().String(),
-// 		Shorthand: ref.Name().Short(),
-// 	}
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	stream.Send(&protobuf.WatchResponse{Head: &head})
-
-// 	return nil
-// }
-
