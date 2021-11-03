@@ -61,7 +61,7 @@ func (service *RepositoryService) GetHead(ctx context.Context, req *protobuf.Emp
 	head := protobuf.Head {
 		Hash: r.Peel(ref).String(),
 		Name: ref.Name,
-		Shorthand: ref.Name,
+		Shorthand: ref.Shorthand(),
 	}
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 	for i, rf := range refs {
 		ref := protobuf.Reference{
 			Name:      rf.Name,
-			Shorthand: rf.Name,
+			Shorthand: rf.Shorthand(),
 			Hash:      string(rf.Target),
 			IsRemote:  plumbing.IsRemote(rf.Name),
 			IsBranch:  plumbing.IsBranch(rf.Name),
@@ -180,7 +180,7 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 	head := protobuf.Head{
 		Hash:      r.Peel(headRef).String(),
 		Name:      headRef.Name,
-		Shorthand: headRef.Name,
+		Shorthand: headRef.Shorthand(),
 	}
 
 	repository := protobuf.Repository{

@@ -63,6 +63,8 @@ func (rt ReferenceTarget) String() string {
 	return string(rt)
 }
 
+var shorthandRegex = regexp.MustCompile(`refs/\w+/`)
+
 type Reference struct {
 	Name   string
 	Target ReferenceTarget
@@ -77,4 +79,8 @@ func NewReference(name string, target []byte) *Reference {
 
 func (r Reference) IsSymbolic() bool {
 	return r.Target.IsReference()
+}
+
+func (r Reference) Shorthand() string {
+	return shorthandRegex.ReplaceAllString(r.Name, "")
 }
