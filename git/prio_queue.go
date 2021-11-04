@@ -16,6 +16,9 @@ type CommitRank struct {
 }
 
 func (cr *CommitRank) GetRank() int {
+	if cr.commit.Committer != cr.commit.Author {
+		return int(cr.commit.Committer.TimeStamp.Unix())
+	}
 	return int(cr.commit.Author.TimeStamp.Unix())
 }
 
