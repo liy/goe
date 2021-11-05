@@ -136,33 +136,4 @@ func main() {
 	// }()
 
 	startService()
-
-	// testRepository()
-	// mine()
-	// processed()
-	// defer profile.Start().Stop()
-
-	// r, err := git.OpenRepository("./repo")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-
-	// raw, err := r.ReadObject(plumbing.ToHash("93e63b972b745f8766f5e529bc346e0d411ae36e"))
-	// fmt.Println(raw.Type)
-
-	// fmt.Println(r.GetReferences())
-
-	// fixture := fixtures.NewRepositoryFixture("topo-sort")
-	// idxFile := fixture.IndexFile("./repos")
-	// packFile := fixture.PackFile("./repos")
-	
-	// idx, _ := indexfile.Decode(idxFile)
-	// packfile.Decode(packFile, idx)
-
-	// ff := tests.FS(false)
-	// f, e := ff.Open("/topo-sort/.git/objects/pack")
-	// fmt.Println(f,e )
-	// fi, e := f.Readdir(2)
-	// fmt.Println(fi, e)
-	// mine()
 }

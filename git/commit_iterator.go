@@ -10,27 +10,56 @@ import (
 var Done = errors.New("no more items in iterator")
 
 type CommitIterator struct {
-	// Avoid process multiple commit
-	waiting map[plumbing.Hash]bool
+	indegree map[plumbing.Hash]int
 	queue   *CommitPrioQueue
 	r       *Repository
+	Size int
 }
 
 func NewCommitIterator(r *Repository, tips []*object.Commit) *CommitIterator {
 	itr := &CommitIterator{
-		waiting: make(map[plumbing.Hash]bool),
+		indegree: make(map[plumbing.Hash]int),
 		queue:   &CommitPrioQueue{},
 		r:       r,
 	}
 
-	for _, c := range tips {
-		if !itr.waiting[c.Hash] {
-			itr.queue.Enqueue(c)
-		}
-		itr.waiting[c.Hash] = true
-	}
+	itr.Size = itr.prepare(tips)
 
 	return itr
+}
+
+func (ci *CommitIterator) traverse(c *object.Commit, visited map[plumbing.Hash]bool) {
+	visited[c.Hash] = true
+	
+	for _, ph := range c.Parents {
+		pc, _ := ci.r.GetCommit(ph)
+		ci.indegree[ph]++
+
+		if !visited[ph] {
+			ci.traverse(pc, visited)
+		}
+	}
+}
+
+func (ci *CommitIterator) prepare(tips []*object.Commit) int {
+	visited := make(map[plumbing.Hash]bool)
+
+	for _, c := range tips {
+		if !visited[c.Hash] {
+			ci.indegree[c.Hash] = 0
+			ci.traverse(c, visited)
+		}
+	}
+
+	queued := make(map[plumbing.Hash]bool, len(tips))
+	for _, t := range tips {
+		if ci.indegree[t.Hash] == 0 && !queued[t.Hash] {
+			queued[t.Hash] = true
+			ci.queue.Enqueue(t)
+		}
+	}
+
+	return len(visited)
 }
 
 func (ci *CommitIterator) Next() (*object.Commit, error) {
@@ -38,22 +67,20 @@ func (ci *CommitIterator) Next() (*object.Commit, error) {
 		return nil, Done
 	}
 
-	// try to get the next commit
+	// // try to get the next commit
 	commit := ci.queue.Dequeue()
 
 	// enqueue next commit's parents
 	for _, ph := range commit.Parents {
-		if ci.waiting[ph] {
-			continue
+		ci.indegree[ph]--
+		if ci.indegree[ph] == 0 {
+			parent, err := ci.r.GetCommit(ph)
+			if err != nil {
+				return commit, errors.New("cannot get parent commit: " + ph.String())
+			}
+			
+			ci.queue.Enqueue(parent)
 		}
-
-		p, err := ci.r.GetCommit(ph)
-		if err != nil {
-			return commit, errors.New("cannot get parent commit: " + ph.String())
-		}
-
-		ci.waiting[ph] = true
-		ci.queue.Enqueue(p)
 	}
 
 	return commit, nil
