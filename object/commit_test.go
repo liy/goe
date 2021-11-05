@@ -11,7 +11,7 @@ func TestDecodeCommit(t *testing.T) {
 	hash := "f2010ee942a47bec0ca7e8f04240968ea5200735"
 	file := tests.NewEmbeded(t).GetObjectFile(hash)
 	raw := plumbing.NewRawObject(plumbing.ToHash(hash))
-	err := raw.ReadFile(file)
+	err := raw.LooseRead(file)
 	if err != nil {
 		t.Fatal(err)
 	}

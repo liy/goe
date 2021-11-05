@@ -99,7 +99,6 @@ func NewHash(bs []byte) Hash {
 
 type RawObject struct {
 	hash Hash
-	// TODO: rename this?
 	// RawType can be normal OBJ_COMMIT, OBJ_TAG, OBJ_BLOB or OBJ_TREE objects
 	// but it can also be a delta of another object which means it can als be
 	// OBJ_OFS_DELTA and OBJ_REF_DELTA
@@ -107,10 +106,8 @@ type RawObject struct {
 	// Type can only be normal git object: OBJ_COMMIT, OBJ_TAG, OBJ_BLOB or OBJ_TREE objects
 	Type         ObjectType
 	Data         []byte
+	// DeflatedSize is the size of the object after deflating
 	DeflatedSize int64
-	// Size of the object in the pack file.
-	// It might be different from the real "DeflatedSize"
-	// PackedSize int64
 }
 
 func NewRawObject(hash Hash) *RawObject {
@@ -132,11 +129,14 @@ func (o *RawObject) Hash() Hash {
 	return o.hash
 }
 
+/*
+Size is the size of the object after deflating
+*/
 func (o *RawObject) Size() int64 {
 	return o.DeflatedSize
 }
 
-func (raw *RawObject) ReadFile(reader io.Reader) error {
+func (raw *RawObject) LooseRead(reader io.Reader) error {
 	zReader := zlib.GetReader(reader)
 	defer zlib.PutReader(zReader)
 

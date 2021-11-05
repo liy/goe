@@ -50,7 +50,7 @@ func TestReadFile(t *testing.T) {
 	fixture := tests.NewEmbeded(t)
 	file := fixture.GetObjectFile(hash)
 	raw := NewRawObject(ToHash(hash))
-	raw.ReadFile(file)
+	raw.LooseRead(file)
 	
 	tests.ToMatchSnapshot(t, raw)
 }
@@ -62,6 +62,6 @@ func BenchmarkReadFile(b *testing.B) {
 	raw := NewRawObject(ToHash(hash))
 	
 	for n :=0; n <b.N; n++ {
-		raw.ReadFile(file)
+		raw.LooseRead(file)
 	}
 }

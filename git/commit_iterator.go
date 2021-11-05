@@ -28,6 +28,9 @@ func NewCommitIterator(r *Repository, tips []*object.Commit) *CommitIterator {
 	return itr
 }
 
+/*
+Traverse function traverses the commit tree and calculate the indegree of each commit.
+*/
 func (ci *CommitIterator) traverse(c *object.Commit, visited map[plumbing.Hash]bool) {
 	visited[c.Hash] = true
 	
@@ -40,7 +43,9 @@ func (ci *CommitIterator) traverse(c *object.Commit, visited map[plumbing.Hash]b
 		}
 	}
 }
-
+/*
+Prepare the commit iterator by calculating the indegree of each commit. Duplicated tip commits are ignored.
+*/
 func (ci *CommitIterator) prepare(tips []*object.Commit) int {
 	visited := make(map[plumbing.Hash]bool)
 
@@ -51,6 +56,7 @@ func (ci *CommitIterator) prepare(tips []*object.Commit) int {
 		}
 	}
 
+	// Removing the duplicated tip commits
 	queued := make(map[plumbing.Hash]bool, len(tips))
 	for _, t := range tips {
 		if ci.indegree[t.Hash] == 0 && !queued[t.Hash] {
@@ -67,10 +73,9 @@ func (ci *CommitIterator) Next() (*object.Commit, error) {
 		return nil, Done
 	}
 
-	// // try to get the next commit
 	commit := ci.queue.Dequeue()
 
-	// enqueue next commit's parents
+	// Try enqueue next commit's parents, if and only if the indegree of the parent is 0
 	for _, ph := range commit.Parents {
 		ci.indegree[ph]--
 		if ci.indegree[ph] == 0 {

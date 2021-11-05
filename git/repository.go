@@ -15,7 +15,7 @@ import (
 	"github.com/liy/goe/store"
 )
 
-var isDotGit, _ = regexp.Compile(".git/?$")
+var isDotGit, _ = regexp.Compile(`\.git/?$`)
 
 type Repository struct {
 	path string
@@ -47,14 +47,14 @@ func SimpleOpen(path string) (repo *Repository, err error) {
 	return Open(path, store.Simple{})
 }
 
-func (r *Repository) ReadObjectFile(hash plumbing.Hash) (*plumbing.RawObject, error) {
+func (r *Repository) ReadLooseObject(hash plumbing.Hash) (*plumbing.RawObject, error) {
 	file, err := r.dotgit.Object(hash.String())
 	if err != nil {
 		return nil, err
 	}
 
 	raw := plumbing.NewRawObject(hash)
-	err = raw.ReadFile(file)
+	err = raw.LooseRead(file)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (r *Repository) ReadObject(hash plumbing.Hash) (raw *plumbing.RawObject, er
 	}
 
 	// Try find it in object folder
-	raw, err = r.ReadObjectFile(hash)
+	raw, err = r.ReadLooseObject(hash)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (r *Repository) GetCommit(hash plumbing.Hash) (c *object.Commit, err error)
 	}
 
 	// Try find it in object folder
-	raw, err = r.ReadObjectFile(hash)
+	raw, err = r.ReadLooseObject(hash)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func (r *Repository) GetAnnotatedTag(hash plumbing.Hash) (t *object.Tag, err err
 	}
 
 	// Try find it in object folder
-	raw, err = r.ReadObjectFile(hash)
+	raw, err = r.ReadLooseObject(hash)
 	if err != nil {
 		return nil, err
 	}
