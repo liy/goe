@@ -93,9 +93,12 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 	
 	refs := r.GetReferences()
 
+	// annotated tags
+	tags := make([]*protobuf.Tag, 0)
+
 	// Setup potential tips
-	tips := make([]*object.Commit, len(refs))
-	for i, ref := range refs {
+	tips := make([]*object.Commit, 0)
+	for _, ref := range refs {
 		var c *object.Commit
 
 		raw, err := r.ReadObject(r.Peel(ref))
@@ -111,6 +114,17 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 				continue
 			}
 
+			tags = append(tags, &protobuf.Tag{
+				Hash: tag.Hash.String(),
+				Name: tag.Name,
+				Message: tag.Message,
+				Tagger: &protobuf.Signature{
+					Name: tag.Tagger.Name,
+					Email: tag.Tagger.Email,
+				},
+				Target: tag.Target.String(),
+			})
+
 			raw, err = r.ReadObject(tag.Target)
 			if err != nil {
 				continue
@@ -123,7 +137,7 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 			continue
 		}
 
-		tips[i] = c
+		tips = append(tips, c)
 	}
 
 	var commits []*protobuf.Commit
@@ -151,11 +165,11 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 			Hash:    c.Hash.String(),
 			Summary: chunks[0],
 			Body:    body,
-			Author: &protobuf.Contact{
-				Name:  c.Author.Name,
+			Author: &protobuf.Signature{
+				Name:  strings.ToValidUTF8(c.Author.Name, ""),
 				Email: c.Author.Email,
 			},
-			Committer: &protobuf.Contact{
+			Committer: &protobuf.Signature{
 				Name:  c.Committer.Name,
 				Email: c.Committer.Email,
 			},
@@ -172,6 +186,7 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 			Hash:      string(rf.Target),
 			IsRemote:  plumbing.IsRemote(rf.Name),
 			IsBranch:  plumbing.IsBranch(rf.Name),
+			IsTag:     plumbing.IsTag(rf.Name),
 		}
 		references[i] = &ref
 	}
@@ -188,6 +203,7 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 		Commits:    commits,
 		References: references,
 		Head:       &head,
+		Tags: 	 tags,
 	}
 
     log.Printf("commits %v", len(commits))
