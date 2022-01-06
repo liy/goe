@@ -13,47 +13,32 @@ import (
 	"github.com/liy/goe/plumbing"
 	"github.com/liy/goe/src/protobuf"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
 	ts "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func startService() {
-	const port = ":8888"
-	listener, err := net.Listen("tcp", port)
+	lis, err := net.Listen("tcp", ":18888")
 	if err != nil {
-		fmt.Println(err)
+		log.Fatalf("failed to listen: %v", err)
 	}
-	credentials, err := credentials.NewServerTLSFromFile("./certificates/server.pem", "./certificates/server.key")
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	opts := []grpc.ServerOption{grpc.Creds(credentials), grpc.MaxRecvMsgSize(100 * 1024 * 1024), grpc.MaxSendMsgSize(100 * 1024 * 1024)}
-	s := grpc.NewServer(opts...)
+	s := grpc.NewServer()
 	protobuf.RegisterRepositoryServiceServer(s, new(RepositoryService))
-	s.Serve(listener)
+	log.Printf("server listening at %v", lis.Addr())
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
 }
 
 type RepositoryService struct {}
 
-func (service *RepositoryService) GetHead(ctx context.Context, req *protobuf.EmptyRequest) (*protobuf.GetHeadResponse, error) {
-	md, ok :=  metadata.FromIncomingContext(ctx);
-	if !ok {
-		return nil, fmt.Errorf("cannot retrieve metadata");
-	}
-
-	var path = "../repos/topo-sort/"
-	if mdValues := md.Get("path"); len(mdValues) != 0 {
-		path = mdValues[0]
-	}
-
+func (service *RepositoryService) GetHead(ctx context.Context, req *protobuf.GetHeadRequest) (*protobuf.GetHeadResponse, error) {
 	start := time.Now()
+    defer log.Printf("get head took %s", time.Since(start))
 
 	// Opens an already existing repository.
-	r, err := git.SimpleOpen(path)
+	r, err := git.SimpleOpen(req.Path)
 	if err != nil {
-		return nil, fmt.Errorf("cannot open repository: %v", path)
+		return nil, fmt.Errorf("cannot open repository: %v", req.Path)
 	}
 	
 	// ... retrieves the branch pointed by HEAD
@@ -67,28 +52,17 @@ func (service *RepositoryService) GetHead(ctx context.Context, req *protobuf.Emp
 		return nil, err
 	}
 
-    log.Printf("Get head took %s", time.Since(start))
-
 	return &protobuf.GetHeadResponse{Head: &head}, nil
 }
 
-func (service *RepositoryService) GetRepository(ctx context.Context, req *protobuf.EmptyRequest) (*protobuf.GetRepositoryResponse, error) {
-	md, ok :=  metadata.FromIncomingContext(ctx);
-	if !ok {
-		return nil, fmt.Errorf("cannot retrieve metadata");
-	}
-
-	var path = "../repos/topo-sort/"
-	if mdValues := md.Get("path"); len(mdValues) != 0 {
-		path = mdValues[0]
-	}
-
+func (service *RepositoryService) GetRepository(ctx context.Context, req *protobuf.GetRepositoryRequest) (*protobuf.GetRepositoryResponse, error) {
 	start := time.Now()
+    defer log.Printf("log all commits took %s", time.Since(start))
 
 	// Opens an already existing repository.
-	r, err := git.SimpleOpen(path)
+	r, err := git.SimpleOpen(req.Path)
 	if err != nil {
-		return nil, fmt.Errorf("cannot open repository: %v", path)
+		return nil, fmt.Errorf("cannot open repository: %v", req.Path)
 	}
 	
 	refs := r.GetReferences()
@@ -199,7 +173,7 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 	}
 
 	repository := protobuf.Repository{
-		Path:       path,
+		Path:       req.Path,
 		Commits:    commits,
 		References: references,
 		Head:       &head,
@@ -207,7 +181,6 @@ func (service *RepositoryService) GetRepository(ctx context.Context, req *protob
 	}
 
     log.Printf("commits %v", len(commits))
-    log.Printf("Log all commits took %s", time.Since(start))
 
 	return &protobuf.GetRepositoryResponse{Repository: &repository}, nil
 }
